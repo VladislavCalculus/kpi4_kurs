@@ -21,4 +21,20 @@ if(BUILD_TESTING)
     add_test(NAME cli_file_input
         COMMAND kpi4_cli --input ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/heartbeat_v2.bin --chunk-size 5)
     set_tests_properties(cli_file_input PROPERTIES PASS_REGULAR_EXPRESSION "bytes=21 chunks=")
+
+    add_executable(kpi4_frame_reader_test tests/frame_reader_test.cpp)
+    target_link_libraries(kpi4_frame_reader_test PRIVATE kpi4_protocol)
+    target_compile_definitions(kpi4_frame_reader_test PRIVATE
+        KPI4_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+    add_test(NAME frame_reader COMMAND kpi4_frame_reader_test)
+
+    add_test(NAME cli_bad_crc
+        COMMAND kpi4_cli --input ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/heartbeat_v2_bad_crc.bin)
+    set_tests_properties(cli_bad_crc PROPERTIES
+        PASS_REGULAR_EXPRESSION "accepted=0 rejected=1 incomplete=0")
+
+    add_test(NAME cli_truncated
+        COMMAND kpi4_cli --input ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/heartbeat_v2_truncated.bin)
+    set_tests_properties(cli_truncated PROPERTIES
+        PASS_REGULAR_EXPRESSION "accepted=0 rejected=0 incomplete=1")
 endif()

@@ -1,4 +1,5 @@
 #include "byte_source.hpp"
+#include <kpi4/protocol/frame_reader.hpp>
 
 #include <charconv>
 #include <cstddef>
@@ -17,7 +18,7 @@ constexpr std::size_t maximum_chunk_size = 65536;
 
 void print_usage(std::ostream& output) {
     output << "Usage: kpi4_cli --input FILE|- [--chunk-size N]\n"
-              "Read binary bytes without decoding MAVLink. N is a 1..65536 byte maximum.\n";
+              "Read and validate MAVLink frames. N is a 1..65536 byte maximum.\n";
 }
 
 bool parse_chunk_size(std::string_view text, std::size_t& size) {
@@ -63,6 +64,7 @@ int main(int argc, char* argv[]) {
     std::vector<std::uint8_t> buffer(chunk_size);
     std::size_t total_bytes = 0;
     std::size_t chunks = 0;
+    kpi4::protocol::FrameReader reader;
     while (true) {
         const auto count = source.read(buffer.data(), buffer.size());
         if (count == 0) {
@@ -74,6 +76,9 @@ int main(int argc, char* argv[]) {
         }
         total_bytes += count;
         ++chunks;
+        for (std::size_t i = 0; i < count; ++i) {
+            reader.consume(buffer[i]);
+        }
     }
 
     if (source.failed()) {
@@ -81,6 +86,10 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    std::cout << "bytes=" << total_bytes << " chunks=" << chunks << '\n';
+    const auto counts = reader.counts();
+    std::cout << "bytes=" << total_bytes << " chunks=" << chunks
+              << " accepted=" << counts.accepted
+              << " rejected=" << counts.rejected
+              << " incomplete=" << counts.incomplete << '\n';
     return 0;
 }
