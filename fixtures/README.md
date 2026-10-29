@@ -14,4 +14,4 @@
 
 Для відтворення файлів запустіть `python3 fixtures/generate.py` у середовищі з PyMavlink 2.4.50. Цей пакет потрібен лише для генерації фікстур, а не для збирання C++ програми. Формат кадру й правило checksum описано в [MAVLink packet serialization guide](https://mavlink.io/en/guide/serialization.html); [згенероване визначення HEARTBEAT](https://github.com/mavlink/c_library_v2/blob/master/minimal/mavlink_msg_heartbeat.h) задає довжину payload і додатковий байт CRC.
 
-Частини в `heartbeat_v2_chunks/` слід подавати читалці послідовно; їхня конкатенація побайтно дорівнює `heartbeat_v2.bin`. Межі порцій не є частиною формату MAVLink. Поточний `frame_reader` перевіряє один повний кадр, помилковий CRC та неповний хвіст; усі позиції поділу потоку належать наступній перевірці.
+Частини в `heartbeat_v2_chunks/` слід подавати читалці послідовно; їхня конкатенація побайтно дорівнює `heartbeat_v2.bin`. Межі порцій не є частиною формату MAVLink. `frame_reader_chunks` перевіряє ці три частини та всі двочастинні поділи валідного кадру.

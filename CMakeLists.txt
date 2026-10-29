@@ -28,6 +28,13 @@ if(BUILD_TESTING)
         KPI4_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
     add_test(NAME frame_reader COMMAND kpi4_frame_reader_test)
 
+    add_executable(kpi4_frame_reader_chunks_test tests/frame_reader_chunks_test.cpp)
+    target_link_libraries(kpi4_frame_reader_chunks_test PRIVATE
+        kpi4_host_input kpi4_protocol)
+    target_compile_definitions(kpi4_frame_reader_chunks_test PRIVATE
+        KPI4_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+    add_test(NAME frame_reader_chunks COMMAND kpi4_frame_reader_chunks_test)
+
     add_test(NAME cli_bad_crc
         COMMAND kpi4_cli --input ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/heartbeat_v2_bad_crc.bin)
     set_tests_properties(cli_bad_crc PROPERTIES
