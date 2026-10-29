@@ -1,0 +1,2 @@
+add_library(kpi4_protocol INTERFACE)
+target_link_libraries(kpi4_protocol INTERFACE kpi4_core)

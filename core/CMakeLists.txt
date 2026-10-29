@@ -1,0 +1,2 @@
+add_library(kpi4_core INTERFACE)
+target_compile_features(kpi4_core INTERFACE cxx_std_17)
