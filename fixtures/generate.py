@@ -34,6 +34,12 @@ def main():
     (directory / "heartbeat_v2_bad_crc.bin").write_bytes(bad_crc)
     (directory / "heartbeat_v2_truncated.bin").write_bytes(valid_v2[:-1])
 
+    parts = directory / "heartbeat_v2_chunks"
+    parts.mkdir(exist_ok=True)
+    for name, chunk in zip(("01.bin", "02.bin", "03.bin"),
+                           (valid_v2[:4], valid_v2[4:13], valid_v2[13:])):
+        (parts / name).write_bytes(chunk)
+
 
 if __name__ == "__main__":
     main()
