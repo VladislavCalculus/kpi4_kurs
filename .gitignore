@@ -3,3 +3,5 @@
 .vscode/
 diagrams/
 /build/
+__pycache__/
+*.pyc

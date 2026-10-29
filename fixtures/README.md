@@ -1,0 +1,14 @@
+# Фікстури байтів MAVLink
+
+Файли `.bin` містять сирі байти для перевірки читалки кадрів. Вони не моделюють завантаження місії чи сумісність із конкретним польотним контролером.
+
+| Файл | Очікуваний результат читалки |
+| --- | --- |
+| `heartbeat_v1.bin` | Один валідний кадр MAVLink 1 `HEARTBEAT`, 17 байтів. |
+| `heartbeat_v2.bin` | Один валідний кадр MAVLink 2 `HEARTBEAT`, 21 байт. |
+| `heartbeat_v2_bad_crc.bin` | Кадр MAVLink 2 завдовжки 21 байт із помилковим CRC. |
+| `heartbeat_v2_truncated.bin` | Неповний кадр MAVLink 2 завдовжки 20 байтів. |
+
+Валідні кадри згенеровано PyMavlink 2.4.50 із діалектів `common`. Обидва мають `seq=0`, `sysid=1`, `compid=1`, `HEARTBEAT` з `msgid=0` і нульові поля повідомлення, крім `mavlink_version=3`. У копії з поганим CRC перший байт payload змінено з `00` на `01` без перерахунку суми. В обрізаній копії видалено останній байт checksum.
+
+Для відтворення файлів запустіть `python3 fixtures/generate.py` у середовищі з PyMavlink 2.4.50. Цей пакет потрібен лише для генерації фікстур, а не для збирання C++ програми. Формат кадру й правило checksum описано в [MAVLink packet serialization guide](https://mavlink.io/en/guide/serialization.html); [згенероване визначення HEARTBEAT](https://github.com/mavlink/c_library_v2/blob/master/minimal/mavlink_msg_heartbeat.h) задає довжину payload і додатковий байт CRC.
