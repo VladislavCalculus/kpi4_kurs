@@ -26,13 +26,14 @@ void check_valid(const char* name, std::uint8_t magic) {
     kpi4::protocol::FrameReader reader;
     std::size_t emitted = 0;
     for (const auto byte : load_fixture(name)) {
-        const auto frame = reader.consume(byte);
-        if (frame) {
+        const auto event = reader.consume(byte);
+        require(!event.rejection, "valid frame was rejected");
+        if (event.frame) {
             ++emitted;
-            require(frame->magic == magic, "wrong MAVLink version");
-            require(frame->msgid == MAVLINK_MSG_ID_HEARTBEAT, "wrong message ID");
-            require(frame->sysid == 1, "wrong system ID");
-            require(frame->compid == 1, "wrong component ID");
+            require(event.frame->magic == magic, "wrong MAVLink version");
+            require(event.frame->msgid == MAVLINK_MSG_ID_HEARTBEAT, "wrong message ID");
+            require(event.frame->sysid == 1, "wrong system ID");
+            require(event.frame->compid == 1, "wrong component ID");
         }
     }
     const auto counts = reader.counts();
@@ -45,13 +46,21 @@ void check_valid(const char* name, std::uint8_t magic) {
 void check_invalid(const char* name, std::size_t rejected,
                    std::size_t incomplete) {
     kpi4::protocol::FrameReader reader;
+    std::size_t bad_crc_events = 0;
     for (const auto byte : load_fixture(name)) {
-        require(!reader.consume(byte), "invalid frame was emitted");
+        const auto event = reader.consume(byte);
+        require(!event.frame, "invalid frame was emitted");
+        if (event.rejection) {
+            require(*event.rejection == kpi4::protocol::FrameRejectReason::BadCrc,
+                    "unexpected rejection reason");
+            ++bad_crc_events;
+        }
     }
     const auto counts = reader.counts();
     require(counts.accepted == 0, "invalid frame was accepted");
     require(counts.rejected == rejected, "rejected count is wrong");
     require(counts.incomplete == incomplete, "incomplete count is wrong");
+    require(bad_crc_events == rejected, "bad CRC event count is wrong");
 }
 
 }  // namespace

@@ -35,6 +35,12 @@ if(BUILD_TESTING)
         KPI4_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
     add_test(NAME frame_reader_chunks COMMAND kpi4_frame_reader_chunks_test)
 
+    add_executable(kpi4_frame_reader_recovery_test tests/frame_reader_recovery_test.cpp)
+    target_link_libraries(kpi4_frame_reader_recovery_test PRIVATE kpi4_protocol)
+    target_compile_definitions(kpi4_frame_reader_recovery_test PRIVATE
+        KPI4_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+    add_test(NAME frame_reader_recovery COMMAND kpi4_frame_reader_recovery_test)
+
     add_test(NAME cli_bad_crc
         COMMAND kpi4_cli --input ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/heartbeat_v2_bad_crc.bin)
     set_tests_properties(cli_bad_crc PROPERTIES
@@ -44,4 +50,9 @@ if(BUILD_TESTING)
         COMMAND kpi4_cli --input ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/heartbeat_v2_truncated.bin)
     set_tests_properties(cli_truncated PROPERTIES
         PASS_REGULAR_EXPRESSION "accepted=0 rejected=0 incomplete=1")
+
+    add_test(NAME cli_recovery
+        COMMAND kpi4_cli --input ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/recovery_stream.bin)
+    set_tests_properties(cli_recovery PROPERTIES
+        PASS_REGULAR_EXPRESSION "accepted=2 rejected=2 incomplete=0 bad_crc=2 bad_signature=0 invalid_header=0")
 endif()

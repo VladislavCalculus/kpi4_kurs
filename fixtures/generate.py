@@ -33,6 +33,9 @@ def main():
     (directory / "heartbeat_v2.bin").write_bytes(valid_v2)
     (directory / "heartbeat_v2_bad_crc.bin").write_bytes(bad_crc)
     (directory / "heartbeat_v2_truncated.bin").write_bytes(valid_v2[:-1])
+    (directory / "recovery_stream.bin").write_bytes(
+        bytes((0x00, 0x7F, 0x12)) + valid_v2[:-1] + valid_v2 + bad_crc + valid_v2
+    )
 
     parts = directory / "heartbeat_v2_chunks"
     parts.mkdir(exist_ok=True)

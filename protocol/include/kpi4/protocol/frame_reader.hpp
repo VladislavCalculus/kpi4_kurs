@@ -14,9 +14,20 @@ struct FrameCounts {
     std::size_t incomplete = 0;
 };
 
+enum class FrameRejectReason {
+    BadCrc,
+    BadSignature,
+    InvalidHeader,
+};
+
+struct FrameReadResult {
+    std::optional<mavlink_message_t> frame;
+    std::optional<FrameRejectReason> rejection;
+};
+
 class FrameReader {
 public:
-    std::optional<mavlink_message_t> consume(std::uint8_t byte);
+    FrameReadResult consume(std::uint8_t byte);
     FrameCounts counts() const;
 
 private:

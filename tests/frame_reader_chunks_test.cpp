@@ -36,10 +36,11 @@ Bytes load_fixture(const char* name) {
 void feed(kpi4::protocol::FrameReader& reader, const std::uint8_t* data,
           std::size_t size, Outcome& outcome) {
     for (std::size_t i = 0; i < size; ++i) {
-        const auto frame = reader.consume(data[i]);
-        if (frame) {
+        const auto event = reader.consume(data[i]);
+        require(!event.rejection, "valid stream produced a rejection");
+        if (event.frame) {
             std::array<std::uint8_t, MAVLINK_MAX_PACKET_LEN> serialized{};
-            const auto length = mavlink_msg_to_send_buffer(serialized.data(), &*frame);
+            const auto length = mavlink_msg_to_send_buffer(serialized.data(), &*event.frame);
             require(length <= serialized.size(), "serialized frame exceeds buffer");
             outcome.frames.emplace_back(serialized.begin(), serialized.begin() + length);
         }

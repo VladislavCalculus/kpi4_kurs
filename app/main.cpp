@@ -64,6 +64,9 @@ int main(int argc, char* argv[]) {
     std::vector<std::uint8_t> buffer(chunk_size);
     std::size_t total_bytes = 0;
     std::size_t chunks = 0;
+    std::size_t bad_crc = 0;
+    std::size_t bad_signature = 0;
+    std::size_t invalid_header = 0;
     kpi4::protocol::FrameReader reader;
     while (true) {
         const auto count = source.read(buffer.data(), buffer.size());
@@ -77,7 +80,20 @@ int main(int argc, char* argv[]) {
         total_bytes += count;
         ++chunks;
         for (std::size_t i = 0; i < count; ++i) {
-            reader.consume(buffer[i]);
+            const auto event = reader.consume(buffer[i]);
+            if (event.rejection) {
+                switch (*event.rejection) {
+                    case kpi4::protocol::FrameRejectReason::BadCrc:
+                        ++bad_crc;
+                        break;
+                    case kpi4::protocol::FrameRejectReason::BadSignature:
+                        ++bad_signature;
+                        break;
+                    case kpi4::protocol::FrameRejectReason::InvalidHeader:
+                        ++invalid_header;
+                        break;
+                }
+            }
         }
     }
 
@@ -90,6 +106,9 @@ int main(int argc, char* argv[]) {
     std::cout << "bytes=" << total_bytes << " chunks=" << chunks
               << " accepted=" << counts.accepted
               << " rejected=" << counts.rejected
-              << " incomplete=" << counts.incomplete << '\n';
+              << " incomplete=" << counts.incomplete
+              << " bad_crc=" << bad_crc
+              << " bad_signature=" << bad_signature
+              << " invalid_header=" << invalid_header << '\n';
     return 0;
 }
