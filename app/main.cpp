@@ -1,7 +1,9 @@
 #include "byte_source.hpp"
+#include "frame_log.hpp"
 #include <kpi4/protocol/frame_reader.hpp>
 
 #include <charconv>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
@@ -81,6 +83,10 @@ int main(int argc, char* argv[]) {
         ++chunks;
         for (std::size_t i = 0; i < count; ++i) {
             const auto event = reader.consume(buffer[i]);
+            if (event.frame) {
+                kpi4::host::write_frame_metadata(
+                    std::cout, *event.frame, std::chrono::system_clock::now());
+            }
             if (event.rejection) {
                 switch (*event.rejection) {
                     case kpi4::protocol::FrameRejectReason::BadCrc:

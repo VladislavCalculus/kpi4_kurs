@@ -8,9 +8,14 @@ add_library(kpi4_host_input app/byte_source.cpp)
 target_compile_features(kpi4_host_input PUBLIC cxx_std_17)
 target_include_directories(kpi4_host_input PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/app)
 
+add_library(kpi4_host_logging app/frame_log.cpp)
+target_compile_features(kpi4_host_logging PUBLIC cxx_std_17)
+target_include_directories(kpi4_host_logging PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/app)
+target_link_libraries(kpi4_host_logging PUBLIC kpi4_protocol)
+
 add_executable(kpi4_cli app/main.cpp)
 target_compile_features(kpi4_cli PRIVATE cxx_std_17)
-target_link_libraries(kpi4_cli PRIVATE kpi4_host_input kpi4_protocol)
+target_link_libraries(kpi4_cli PRIVATE kpi4_host_input kpi4_host_logging)
 
 include(CTest)
 if(BUILD_TESTING)
@@ -55,4 +60,18 @@ if(BUILD_TESTING)
         COMMAND kpi4_cli --input ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/recovery_stream.bin)
     set_tests_properties(cli_recovery PROPERTIES
         PASS_REGULAR_EXPRESSION "accepted=2 rejected=2 incomplete=0 bad_crc=2 bad_signature=0 invalid_header=0")
+
+    add_executable(kpi4_frame_log_test tests/frame_log_test.cpp)
+    target_link_libraries(kpi4_frame_log_test PRIVATE kpi4_host_logging)
+    add_test(NAME frame_log COMMAND kpi4_frame_log_test)
+
+    add_test(NAME cli_metadata_v1
+        COMMAND kpi4_cli --input ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/heartbeat_v1.bin)
+    set_tests_properties(cli_metadata_v1 PROPERTIES
+        PASS_REGULAR_EXPRESSION "frame time=.*Z mavlink=1 sysid=1 compid=1 msgid=0 seq=0 len=9 signed=no")
+
+    add_test(NAME cli_metadata_v2
+        COMMAND kpi4_cli --input ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/heartbeat_v2.bin)
+    set_tests_properties(cli_metadata_v2 PROPERTIES
+        PASS_REGULAR_EXPRESSION "frame time=.*Z mavlink=2 sysid=1 compid=1 msgid=0 seq=0 len=9 signed=no")
 endif()
