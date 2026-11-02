@@ -26,7 +26,8 @@ void check_valid(const char* name, std::uint8_t magic) {
     kpi4::protocol::FrameReader reader;
     std::size_t emitted = 0;
     for (const auto byte : load_fixture(name)) {
-        const auto event = reader.consume(byte);
+        const auto event = reader.consume(
+            kpi4::protocol::InputChannel::Unspecified, byte);
         require(!event.rejection, "valid frame was rejected");
         if (event.frame) {
             ++emitted;
@@ -36,7 +37,7 @@ void check_valid(const char* name, std::uint8_t magic) {
             require(event.frame->compid == 1, "wrong component ID");
         }
     }
-    const auto counts = reader.counts();
+    const auto counts = reader.counts(kpi4::protocol::InputChannel::Unspecified);
     require(emitted == 1, "valid frame was not emitted exactly once");
     require(counts.accepted == 1, "valid frame count is wrong");
     require(counts.rejected == 0, "valid frame was rejected");
@@ -48,7 +49,8 @@ void check_invalid(const char* name, std::size_t rejected,
     kpi4::protocol::FrameReader reader;
     std::size_t bad_crc_events = 0;
     for (const auto byte : load_fixture(name)) {
-        const auto event = reader.consume(byte);
+        const auto event = reader.consume(
+            kpi4::protocol::InputChannel::Unspecified, byte);
         require(!event.frame, "invalid frame was emitted");
         if (event.rejection) {
             require(*event.rejection == kpi4::protocol::FrameRejectReason::BadCrc,
@@ -56,7 +58,7 @@ void check_invalid(const char* name, std::size_t rejected,
             ++bad_crc_events;
         }
     }
-    const auto counts = reader.counts();
+    const auto counts = reader.counts(kpi4::protocol::InputChannel::Unspecified);
     require(counts.accepted == 0, "invalid frame was accepted");
     require(counts.rejected == rejected, "rejected count is wrong");
     require(counts.incomplete == incomplete, "incomplete count is wrong");
@@ -72,7 +74,7 @@ int main() {
     check_invalid("heartbeat_v2_truncated.bin", 0, 1);
 
     kpi4::protocol::FrameReader empty;
-    const auto counts = empty.counts();
+    const auto counts = empty.counts(kpi4::protocol::InputChannel::Unspecified);
     require(counts.accepted == 0 && counts.rejected == 0 && counts.incomplete == 0,
             "empty input should have zero counts");
 }

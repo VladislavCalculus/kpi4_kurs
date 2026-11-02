@@ -36,7 +36,8 @@ Bytes load_fixture(const char* name) {
 void feed(kpi4::protocol::FrameReader& reader, const std::uint8_t* data,
           std::size_t size, Outcome& outcome) {
     for (std::size_t i = 0; i < size; ++i) {
-        const auto event = reader.consume(data[i]);
+        const auto event = reader.consume(
+            kpi4::protocol::InputChannel::Unspecified, data[i]);
         require(!event.rejection, "valid stream produced a rejection");
         if (event.frame) {
             std::array<std::uint8_t, MAVLINK_MAX_PACKET_LEN> serialized{};
@@ -45,7 +46,7 @@ void feed(kpi4::protocol::FrameReader& reader, const std::uint8_t* data,
             outcome.frames.emplace_back(serialized.begin(), serialized.begin() + length);
         }
     }
-    outcome.counts = reader.counts();
+    outcome.counts = reader.counts(kpi4::protocol::InputChannel::Unspecified);
 }
 
 Outcome run_chunks(const std::vector<Bytes>& chunks) {

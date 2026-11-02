@@ -82,7 +82,8 @@ int main(int argc, char* argv[]) {
         total_bytes += count;
         ++chunks;
         for (std::size_t i = 0; i < count; ++i) {
-            const auto event = reader.consume(buffer[i]);
+            const auto event = reader.consume(
+                kpi4::protocol::InputChannel::Unspecified, buffer[i]);
             if (event.frame) {
                 kpi4::host::write_frame_metadata(
                     std::cout, *event.frame, std::chrono::system_clock::now());
@@ -108,7 +109,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    const auto counts = reader.counts();
+    const auto counts = reader.counts(kpi4::protocol::InputChannel::Unspecified);
     std::cout << "bytes=" << total_bytes << " chunks=" << chunks
               << " accepted=" << counts.accepted
               << " rejected=" << counts.rejected

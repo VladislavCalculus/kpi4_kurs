@@ -30,7 +30,8 @@ void check_recovery_stream() {
     std::vector<Reason> rejections;
     std::size_t accepted_events = 0;
     for (const auto byte : load_fixture("recovery_stream.bin")) {
-        const auto event = reader.consume(byte);
+        const auto event = reader.consume(
+            kpi4::protocol::InputChannel::Unspecified, byte);
         require(!(event.frame && event.rejection), "one byte produced conflicting events");
         if (event.frame) {
             ++accepted_events;
@@ -41,7 +42,7 @@ void check_recovery_stream() {
             rejections.push_back(*event.rejection);
         }
     }
-    const auto counts = reader.counts();
+    const auto counts = reader.counts(kpi4::protocol::InputChannel::Unspecified);
     require(accepted_events == 2 && counts.accepted == 2,
             "valid frames after damage were lost");
     require(rejections == std::vector<Reason>{Reason::BadCrc, Reason::BadCrc},
@@ -58,11 +59,12 @@ void check_noise_before_valid_frame() {
     kpi4::protocol::FrameReader reader;
     std::size_t accepted_events = 0;
     for (const auto byte : input) {
-        const auto event = reader.consume(byte);
+        const auto event = reader.consume(
+            kpi4::protocol::InputChannel::Unspecified, byte);
         require(!event.rejection, "noise caused a rejected frame");
         accepted_events += event.frame.has_value() ? 1u : 0u;
     }
-    const auto counts = reader.counts();
+    const auto counts = reader.counts(kpi4::protocol::InputChannel::Unspecified);
     require(accepted_events == 1 && counts.accepted == 1 &&
                 counts.rejected == 0 && counts.incomplete == 0,
             "valid frame after noise was lost");
@@ -77,7 +79,8 @@ void check_invalid_header_recovery() {
     std::vector<Reason> rejections;
     std::size_t accepted_events = 0;
     for (const auto byte : input) {
-        const auto event = reader.consume(byte);
+        const auto event = reader.consume(
+            kpi4::protocol::InputChannel::Unspecified, byte);
         if (event.frame) {
             ++accepted_events;
         }
@@ -85,7 +88,7 @@ void check_invalid_header_recovery() {
             rejections.push_back(*event.rejection);
         }
     }
-    const auto counts = reader.counts();
+    const auto counts = reader.counts(kpi4::protocol::InputChannel::Unspecified);
     require(rejections == std::vector<Reason>{Reason::InvalidHeader},
             "invalid header reason missing");
     require(accepted_events == 1 && counts.accepted == 1 &&

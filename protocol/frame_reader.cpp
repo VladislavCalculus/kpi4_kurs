@@ -2,13 +2,15 @@
 
 namespace kpi4::protocol {
 
-FrameReadResult FrameReader::consume(std::uint8_t byte) {
+FrameReadResult FrameReader::consume(InputChannel channel, std::uint8_t byte) {
+    auto& state = channels_[static_cast<std::size_t>(channel)];
     const auto framing = mavlink_frame_char_buffer(
-        &receive_buffer_, &status_, byte, &candidate_, &result_status_);
+        &state.receive_buffer, &state.status, byte, &state.candidate,
+        &state.result_status);
 
     if (framing == MAVLINK_FRAMING_OK) {
-        ++accepted_;
-        return {candidate_, std::nullopt};
+        ++state.accepted;
+        return {channel, state.candidate, std::nullopt};
     }
 
     std::optional<FrameRejectReason> reason;
@@ -16,24 +18,26 @@ FrameReadResult FrameReader::consume(std::uint8_t byte) {
         reason = FrameRejectReason::BadCrc;
     } else if (framing == MAVLINK_FRAMING_BAD_SIGNATURE) {
         reason = FrameRejectReason::BadSignature;
-    } else if (result_status_.packet_rx_drop_count != 0) {
+    } else if (state.result_status.packet_rx_drop_count != 0) {
         reason = FrameRejectReason::InvalidHeader;
     }
     if (reason) {
-        ++rejected_;
-        if (status_.parse_state == MAVLINK_PARSE_STATE_IDLE &&
+        ++state.rejected;
+        if (state.status.parse_state == MAVLINK_PARSE_STATE_IDLE &&
             (byte == MAVLINK_STX || byte == MAVLINK_STX_MAVLINK1)) {
             mavlink_frame_char_buffer(
-                &receive_buffer_, &status_, byte, &candidate_, &result_status_);
+                &state.receive_buffer, &state.status, byte, &state.candidate,
+                &state.result_status);
         }
     }
-    return {std::nullopt, reason};
+    return {channel, std::nullopt, reason};
 }
 
-FrameCounts FrameReader::counts() const {
-    const bool pending = status_.parse_state != MAVLINK_PARSE_STATE_IDLE &&
-                         status_.parse_state != MAVLINK_PARSE_STATE_UNINIT;
-    return {accepted_, rejected_, pending ? 1u : 0u};
+FrameCounts FrameReader::counts(InputChannel channel) const {
+    const auto& state = channels_[static_cast<std::size_t>(channel)];
+    const bool pending = state.status.parse_state != MAVLINK_PARSE_STATE_IDLE &&
+                         state.status.parse_state != MAVLINK_PARSE_STATE_UNINIT;
+    return {state.accepted, state.rejected, pending ? 1u : 0u};
 }
 
 }  // namespace kpi4::protocol
