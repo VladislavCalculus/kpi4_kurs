@@ -1,0 +1,4 @@
+configure	exit=0	command=cmake -S . -B build
+build	exit=0	command=cmake --build build
+ctest	exit=0	command=ctest --test-dir build --output-on-failure
+compile_probe	exit=0	command=c++ -std=c++17 -Iapp -Iprotocol/include -Ithird_party/mavlink devlogs/manual/M01-frame-reader/two_source_probe.cpp protocol/frame_reader.cpp app/frame_log.cpp -o build/m01_two_source_probe

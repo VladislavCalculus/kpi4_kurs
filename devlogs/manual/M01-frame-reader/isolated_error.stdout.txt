@@ -1,0 +1,4 @@
+source=gs rejected=bad_crc
+source=controller frame time=2026-11-02T11:27:12.688Z mavlink=2 sysid=1 compid=1 msgid=0 seq=0 len=9 signed=no
+source=gs bytes=21 accepted=0 rejected=1 incomplete=0
+source=controller bytes=21 accepted=1 rejected=0 incomplete=0

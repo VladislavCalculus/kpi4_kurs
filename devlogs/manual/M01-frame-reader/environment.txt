@@ -1,0 +1,12 @@
+run_start_local=2026-11-02T13:27:11.743953+02:00
+timezone=Europe/Kiev
+working_directory=/Users/admin/kpi3/kpi4/src
+platform=macOS-15.7.9-x86_64-i386-64bit-Mach-O
+git_head=1ff74de97cdbee4d2c9f54a025191e680f9eea5f
+compiler=Apple clang version 17.0.0 (clang-1700.3.19.1)
+cmake=cmake version 4.4.4
+seed=none
+input=heartbeat_v1.bin bytes=17 sha256=312a9334db339041bf9ca967a70a130b71fdf46a6e9c31fc36b8669e1aa7baa3
+input=heartbeat_v2.bin bytes=21 sha256=0bed4097dcd31a31fdf4d568381efaa18f9f6c05a65f5ed77d3000cb4e798713
+input=heartbeat_v2_bad_crc.bin bytes=21 sha256=ca20c012fe15c60d1d53fda354b5f0c4b203577d88bcf830b3cd2ba2e6ab52f1
+input=recovery_stream.bin bytes=86 sha256=461c6c7d8d356982a804a5ad48200094a2f886cff092d3c1b1e2a8cd8d34bc36

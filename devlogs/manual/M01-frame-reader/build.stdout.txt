@@ -1,0 +1,10 @@
+[ 10%] Built target kpi4_host_input
+[ 20%] Built target kpi4_protocol
+[ 30%] Built target kpi4_host_logging
+[ 40%] Built target kpi4_cli
+[ 50%] Built target kpi4_byte_source_test
+[ 60%] Built target kpi4_frame_reader_test
+[ 70%] Built target kpi4_frame_reader_chunks_test
+[ 80%] Built target kpi4_frame_reader_recovery_test
+[ 90%] Built target kpi4_frame_reader_channels_test
+[100%] Built target kpi4_frame_log_test

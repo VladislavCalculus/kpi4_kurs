@@ -1,0 +1,3 @@
+frame time=2026-11-02T11:27:11.923Z mavlink=2 sysid=1 compid=1 msgid=0 seq=0 len=9 signed=no
+frame time=2026-11-02T11:27:11.926Z mavlink=2 sysid=1 compid=1 msgid=0 seq=0 len=9 signed=no
+bytes=86 chunks=18 accepted=2 rejected=2 incomplete=0 bad_crc=2 bad_signature=0 invalid_header=0

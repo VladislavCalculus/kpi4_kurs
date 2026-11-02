@@ -1,0 +1,4 @@
+valid	exit=0	command=./build/kpi4_cli --input fixtures/heartbeat_v2.bin --chunk-size 5
+damaged	exit=0	command=./build/kpi4_cli --input fixtures/recovery_stream.bin --chunk-size 5
+two_sources	exit=0	command=./build/m01_two_source_probe fixtures/heartbeat_v1.bin fixtures/heartbeat_v2.bin
+isolated_error	exit=0	command=./build/m01_two_source_probe fixtures/heartbeat_v2_bad_crc.bin fixtures/heartbeat_v2.bin
