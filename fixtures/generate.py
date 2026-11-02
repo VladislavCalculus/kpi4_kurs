@@ -21,6 +21,21 @@ def heartbeat_frame(dialect):
     return message.pack(sender)
 
 
+def identity_frame(system, component, vehicle_type, autopilot, status):
+    sender = mavlink2.MAVLink(None)
+    sender.srcSystem = system
+    sender.srcComponent = component
+    message = mavlink2.MAVLink_heartbeat_message(
+        type=vehicle_type,
+        autopilot=autopilot,
+        base_mode=4,
+        custom_mode=0x12345678,
+        system_status=status,
+        mavlink_version=3,
+    )
+    return message.pack(sender)
+
+
 def main():
     directory = Path(__file__).resolve().parent
     valid_v1 = heartbeat_frame(mavlink1)
@@ -33,6 +48,15 @@ def main():
     (directory / "heartbeat_v2.bin").write_bytes(valid_v2)
     (directory / "heartbeat_v2_bad_crc.bin").write_bytes(bad_crc)
     (directory / "heartbeat_v2_truncated.bin").write_bytes(valid_v2[:-1])
+    (directory / "heartbeat_gcs_v2.bin").write_bytes(
+        identity_frame(42, 190, 6, 8, 3)
+    )
+    (directory / "heartbeat_vehicle_v2.bin").write_bytes(
+        identity_frame(7, 1, 2, 12, 4)
+    )
+    (directory / "heartbeat_unknown_v2.bin").write_bytes(
+        identity_frame(99, 2, 255, 255, 255)
+    )
     (directory / "recovery_stream.bin").write_bytes(
         bytes((0x00, 0x7F, 0x12)) + valid_v2[:-1] + valid_v2 + bad_crc + valid_v2
     )

@@ -1,6 +1,7 @@
 #include "byte_source.hpp"
 #include "frame_log.hpp"
 #include <kpi4/protocol/frame_reader.hpp>
+#include <kpi4/protocol/heartbeat.hpp>
 
 #include <charconv>
 #include <chrono>
@@ -28,6 +29,18 @@ bool parse_chunk_size(std::string_view text, std::size_t& size) {
     const auto result = std::from_chars(text.data(), end, size);
     return result.ec == std::errc{} && result.ptr == end && size > 0 &&
            size <= maximum_chunk_size;
+}
+
+std::string_view channel_name(kpi4::protocol::InputChannel channel) {
+    switch (channel) {
+        case kpi4::protocol::InputChannel::GroundStation:
+            return "ground_station";
+        case kpi4::protocol::InputChannel::ControllerX:
+            return "controller_x";
+        case kpi4::protocol::InputChannel::Unspecified:
+            return "unspecified";
+    }
+    return "unknown";
 }
 
 }  // namespace
@@ -87,6 +100,18 @@ int main(int argc, char* argv[]) {
             if (event.frame) {
                 kpi4::host::write_frame_metadata(
                     std::cout, *event.frame, std::chrono::system_clock::now());
+                if (const auto heartbeat = kpi4::protocol::decode_heartbeat(event)) {
+                    std::cout << "heartbeat channel=" << channel_name(heartbeat->channel)
+                              << " sysid=" << static_cast<unsigned>(heartbeat->sysid)
+                              << " compid=" << static_cast<unsigned>(heartbeat->compid)
+                              << " type=" << kpi4::protocol::heartbeat_type_name(heartbeat->type)
+                              << '(' << static_cast<unsigned>(heartbeat->type) << ')'
+                              << " autopilot=" << kpi4::protocol::heartbeat_autopilot_name(heartbeat->autopilot)
+                              << '(' << static_cast<unsigned>(heartbeat->autopilot) << ')'
+                              << " status=" << kpi4::protocol::heartbeat_state_name(heartbeat->system_status)
+                              << '(' << static_cast<unsigned>(heartbeat->system_status) << ')'
+                              << '\n';
+                }
             }
             if (event.rejection) {
                 switch (*event.rejection) {

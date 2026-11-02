@@ -52,6 +52,22 @@ if(BUILD_TESTING)
         KPI4_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
     add_test(NAME frame_reader_channels COMMAND kpi4_frame_reader_channels_test)
 
+    add_executable(kpi4_heartbeat_test tests/heartbeat_test.cpp)
+    target_link_libraries(kpi4_heartbeat_test PRIVATE kpi4_protocol)
+    target_compile_definitions(kpi4_heartbeat_test PRIVATE
+        KPI4_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+    add_test(NAME heartbeat COMMAND kpi4_heartbeat_test)
+
+    add_test(NAME cli_heartbeat_gcs
+        COMMAND kpi4_cli --input ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/heartbeat_gcs_v2.bin)
+    set_tests_properties(cli_heartbeat_gcs PROPERTIES
+        PASS_REGULAR_EXPRESSION "heartbeat channel=unspecified sysid=42 compid=190 type=GCS\\(6\\) autopilot=INVALID\\(8\\) status=STANDBY\\(3\\)")
+
+    add_test(NAME cli_heartbeat_unknown
+        COMMAND kpi4_cli --input ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/heartbeat_unknown_v2.bin)
+    set_tests_properties(cli_heartbeat_unknown PROPERTIES
+        PASS_REGULAR_EXPRESSION "heartbeat channel=unspecified sysid=99 compid=2 type=UNKNOWN\\(255\\) autopilot=UNKNOWN\\(255\\) status=UNKNOWN\\(255\\)")
+
     add_test(NAME cli_bad_crc
         COMMAND kpi4_cli --input ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/heartbeat_v2_bad_crc.bin)
     set_tests_properties(cli_bad_crc PROPERTIES
