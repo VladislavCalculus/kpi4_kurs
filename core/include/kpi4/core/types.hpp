@@ -47,7 +47,8 @@ struct NorthEastVelocity {
 struct MissionItem {
     std::uint32_t sequence;
     Wgs84Position target;
-    std::optional<Altitude> altitude;
+    AltitudeReference altitude_reference;
+    std::optional<Meters> altitude;
     std::optional<MetersPerSecond> desired_speed;
 };
 
