@@ -58,6 +58,10 @@ if(BUILD_TESTING)
         KPI4_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
     add_test(NAME heartbeat COMMAND kpi4_heartbeat_test)
 
+    add_executable(kpi4_mission_transfer_test tests/mission_transfer_test.cpp)
+    target_link_libraries(kpi4_mission_transfer_test PRIVATE kpi4_protocol)
+    add_test(NAME mission_transfer COMMAND kpi4_mission_transfer_test)
+
     add_test(NAME cli_heartbeat_gcs
         COMMAND kpi4_cli --input ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/heartbeat_gcs_v2.bin)
     set_tests_properties(cli_heartbeat_gcs PROPERTIES
