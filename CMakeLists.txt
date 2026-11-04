@@ -72,6 +72,10 @@ if(BUILD_TESTING)
     add_test(NAME mission_command_validator
         COMMAND kpi4_mission_command_validator_test)
 
+    add_executable(kpi4_estimated_position_test tests/estimated_position_test.cpp)
+    target_link_libraries(kpi4_estimated_position_test PRIVATE kpi4_protocol)
+    add_test(NAME estimated_position COMMAND kpi4_estimated_position_test)
+
     add_test(NAME cli_heartbeat_gcs
         COMMAND kpi4_cli --input ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/heartbeat_gcs_v2.bin)
     set_tests_properties(cli_heartbeat_gcs PROPERTIES

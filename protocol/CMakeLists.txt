@@ -1,5 +1,5 @@
 add_library(kpi4_protocol STATIC frame_reader.cpp heartbeat.cpp mission_transfer.cpp
-    mission_normalizer.cpp mission_command_validator.cpp)
+    mission_normalizer.cpp mission_command_validator.cpp estimated_position.cpp)
 target_compile_features(kpi4_protocol PUBLIC cxx_std_17)
 target_include_directories(kpi4_protocol PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
