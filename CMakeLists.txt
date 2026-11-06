@@ -3,6 +3,7 @@ project(kpi4 LANGUAGES CXX)
 
 add_subdirectory(core)
 add_subdirectory(protocol)
+add_subdirectory(state)
 
 add_library(kpi4_host_input app/byte_source.cpp)
 target_compile_features(kpi4_host_input PUBLIC cxx_std_17)
@@ -79,6 +80,10 @@ if(BUILD_TESTING)
     add_executable(kpi4_raw_gps_test tests/raw_gps_test.cpp)
     target_link_libraries(kpi4_raw_gps_test PRIVATE kpi4_protocol)
     add_test(NAME raw_gps COMMAND kpi4_raw_gps_test)
+
+    add_executable(kpi4_state_provider_test tests/state_provider_test.cpp)
+    target_link_libraries(kpi4_state_provider_test PRIVATE kpi4_state)
+    add_test(NAME state_provider COMMAND kpi4_state_provider_test)
 
     add_test(NAME cli_heartbeat_gcs
         COMMAND kpi4_cli --input ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/heartbeat_gcs_v2.bin)
