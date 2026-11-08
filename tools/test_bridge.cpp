@@ -65,6 +65,11 @@ void emit_upload(const protocol::MissionUploadTransition& transition) {
         if (value->ack) std::cout << static_cast<unsigned>(value->ack->result);
         else std::cout << '-';
         std::cout << '\n';
+    } else if (const auto* value = std::get_if<protocol::MissionUploadAck>(&transition)) {
+        std::cout << "UPACK\t" << value->target.system_id << '\t'
+                  << static_cast<unsigned>(value->target.component_id) << '\t'
+                  << static_cast<unsigned>(value->mission_type) << '\t'
+                  << static_cast<unsigned>(value->result) << '\n';
     }
 }
 
@@ -153,6 +158,8 @@ int main() {
     kpi4::protocol::FrameReader reader;
     std::optional<mavlink_message_t> last;
     std::unique_ptr<protocol::MissionUploadAssembler> upload;
+    std::optional<protocol::MissionUploadCandidate> active_plan;
+    std::optional<protocol::MissionUploadCandidate> staged_plan;
     std::unique_ptr<state::MavlinkStateProvider> state_provider;
     std::unique_ptr<state::StateValidator> validator;
     state::SimulatedStateProvider simulated;
@@ -205,7 +212,13 @@ int main() {
                                       << '\t' << kpi4::protocol::heartbeat_state_name(heartbeat->system_status) << '\n';
                         if (const auto mission = protocol::decode_mission_transfer(result)) {
                             emit_mission(*mission);
-                            if (upload) emit_upload(upload->ingest(*mission));
+                            if (upload) {
+                                auto transition = upload->ingest(*mission, now);
+                                if (const auto* completed =
+                                        std::get_if<protocol::MissionUploadCompleted>(&transition))
+                                    staged_plan = completed->candidate;
+                                emit_upload(transition);
+                            }
                         }
                         if (const auto estimated = protocol::decode_global_position_int(result)) {
                             if (const auto* value = std::get_if<protocol::EstimatedPosition>(&*estimated)) {
@@ -230,9 +243,30 @@ int main() {
                 std::uint32_t system;
                 unsigned component, maximum;
                 input >> system >> component >> maximum;
+                std::uint64_t timeout = 250'000;
+                unsigned retries = 5;
+                if (input >> timeout) {
+                    if (!(input >> retries))
+                        throw std::runtime_error("upload policy requires timeout and retries");
+                }
                 upload = std::make_unique<protocol::MissionUploadAssembler>(
                     system, static_cast<std::uint8_t>(component),
-                    static_cast<std::uint16_t>(maximum));
+                    static_cast<std::uint16_t>(maximum),
+                    protocol::MissionUploadPolicy{timeout, static_cast<std::uint8_t>(retries)});
+            } else if (command == "tick") {
+                input >> now.value;
+                if (upload) {
+                    auto transition = upload->poll(now);
+                    if (std::holds_alternative<protocol::MissionUploadRejection>(transition))
+                        staged_plan.reset();
+                    emit_upload(transition);
+                }
+            } else if (command == "active") {
+                if (active_plan)
+                    std::cout << "ACTIVE\t" << active_plan->source.system_id << '\t'
+                              << active_plan->items.size() << '\t'
+                              << active_plan->items.front().target.latitude.value << '\n';
+                else std::cout << "ACTIVE\t-\n";
             } else if (command == "wide_count") {
                 std::uint32_t target;
                 input >> target;
@@ -293,6 +327,9 @@ int main() {
                 input >> result;
                 const auto value = upload ? upload->finish_after_plan_decision(
                     static_cast<std::uint8_t>(result)) : std::nullopt;
+                if (value && result == MAV_MISSION_ACCEPTED && staged_plan)
+                    active_plan = std::move(staged_plan);
+                staged_plan.reset();
                 if (value) std::cout << "UPACK\t" << value->target.system_id << '\t'
                                      << static_cast<unsigned>(value->target.component_id) << '\t'
                                      << static_cast<unsigned>(value->mission_type) << '\t'

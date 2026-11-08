@@ -41,6 +41,11 @@ struct MissionUploadCompleted {
     MissionUploadCandidate candidate;
 };
 
+struct MissionUploadPolicy {
+    std::uint64_t item_timeout_us = 250'000;
+    std::uint8_t max_retries = 5;
+};
+
 enum class MissionUploadError {
     InvalidConfiguration,
     WrongTarget,
@@ -54,6 +59,7 @@ enum class MissionUploadError {
     UnexpectedSequence,
     UnsupportedCommand,
     InvalidItem,
+    RetriesExhausted,
 };
 
 struct MissionUploadRejection {
@@ -63,17 +69,21 @@ struct MissionUploadRejection {
 
 using MissionUploadTransition =
     std::variant<std::monostate, MissionUploadRequest,
-                 MissionUploadCompleted, MissionUploadRejection>;
+                 MissionUploadCompleted, MissionUploadRejection, MissionUploadAck>;
 
 class MissionUploadAssembler {
 public:
     // Endpoint identity and storage bound are supplied by integration.
     MissionUploadAssembler(std::uint32_t system_id, std::uint8_t component_id,
-                           std::uint16_t max_items);
+                           std::uint16_t max_items,
+                           MissionUploadPolicy policy = {});
 
     // Handles GCS COUNT and ITEM_INT for one upload. REQUEST_INT and ACK are
     // outbound roles here; incoming instances are ignored.
-    MissionUploadTransition ingest(const MissionTransferEvent& event);
+    MissionUploadTransition ingest(const MissionTransferEvent& event,
+                                   core::MonotonicMicroseconds now);
+    // Call periodically with the same monotonic clock used by ingest().
+    MissionUploadTransition poll(core::MonotonicMicroseconds now);
     // The owner accepts/rejects the complete candidate before this method
     // produces the final ACK. Returns no ACK before completion.
     std::optional<MissionUploadAck> finish_after_plan_decision(
@@ -85,16 +95,30 @@ private:
         MissionUploadPeer source;
         MissionAddress address;
         std::uint16_t count;
+        std::uint32_t opaque_id;
         std::uint16_t next_seq;
         std::vector<core::MissionItem> items;
         std::vector<MissionItemInt> raw_items;
+        core::MonotonicMicroseconds last_request_at;
+        std::uint8_t retries;
+    };
+
+    struct LastAck {
+        MissionUploadPeer source;
+        MissionItemInt final_item;
+        MissionUploadAck ack;
     };
 
     std::uint32_t system_id_;
     std::uint8_t component_id_;
     std::uint16_t max_items_;
+    MissionUploadPolicy policy_;
     std::optional<Pending> pending_;
     std::optional<MissionUploadAck> awaiting_plan_decision_;
+    std::optional<MissionItemInt> completed_final_item_;
+    std::optional<LastAck> last_ack_;
+
+    MissionUploadTransition retry_or_cancel(core::MonotonicMicroseconds now);
 };
 
 }  // namespace kpi4::protocol

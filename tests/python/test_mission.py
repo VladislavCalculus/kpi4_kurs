@@ -68,10 +68,11 @@ class MissionTests(unittest.TestCase):
                         feed(count(1)), "ack 0", "ack 0",
                         feed(count(1)), feed(item(0)), "ack 1")
         self.assertEqual(rows(output, "UPREQ"),
-                         [["42", "190", "0", "0"], ["42", "190", "0", "1"],
+                         [["42", "190", "0", "0"], ["42", "190", "0", "0"],
+                          ["42", "190", "0", "1"],
                           ["42", "190", "0", "0"]])
         self.assertEqual(rows(output, "UPREJECT"),
-                         [["9", "-"], ["7", "-"], ["8", "-"], ["5", "-"], ["5", "-"]])
+                         [["7", "-"], ["8", "-"], ["5", "-"], ["5", "-"]])
         self.assertEqual(rows(output, "UPCOMPLETE"),
                          [["42", "190", "0", "2"], ["42", "190", "0", "1"]])
         self.assertEqual(rows(output, "UPITEM")[:2],
@@ -97,6 +98,69 @@ class MissionTests(unittest.TestCase):
         self.assertEqual(len(rows(output, "UPCOMPLETE")), 1)
         self.assertEqual(len(rows(output, "UPACK")), 1)
         self.assertFalse(rows(output, "UPREJECT"))
+
+    def test_duplicate_and_out_of_order_items_request_expected_sequence(self):
+        output = bridge("upload 7 1 3", feed(count(3)), feed(count(3)),
+                        feed(item(1)), feed(item(0)), feed(item(0)),
+                        feed(item(2)), feed(item(1)), feed(item(2)),
+                        "ack 0", feed(item(2)), feed(item(2, lat=123000000)))
+        self.assertEqual([row[-1] for row in rows(output, "UPREQ")],
+                         ["0", "0", "0", "1", "1", "1", "2"])
+        self.assertEqual(len(rows(output, "UPCOMPLETE")), 1)
+        self.assertEqual(len(rows(output, "UPITEM")), 3)
+        self.assertEqual(rows(output, "UPACK"),
+                         [["42", "190", "0", "0"], ["42", "190", "0", "0"]])
+        self.assertEqual(rows(output, "UPREJECT"), [["6", "-"]])
+
+    def test_timeout_boundaries_retry_limit_and_restart(self):
+        output = bridge("upload 7 1 2", feed(count(2)),
+                        "tick 249999", "tick 250000", "tick 499999",
+                        "tick 500000", "tick 750000", "tick 1000000",
+                        "tick 1250000", "tick 1500000", feed(count(1)))
+        self.assertEqual([row[-1] for row in rows(output, "UPREQ")],
+                         ["0"] * 7)  # initial, five retries, fresh upload
+        self.assertEqual(rows(output, "UPREJECT"), [["12", "15"]])
+        self.assertEqual(len(rows(output, "UPCOMPLETE")), 0)
+
+        reset = bridge("upload 7 1 2", feed(count(2)), "tick 250000",
+                       feed(item(0)), "tick 499999", "tick 500000")
+        self.assertEqual([row[-1] for row in rows(reset, "UPREQ")],
+                         ["0", "0", "1", "1"])
+        self.assertFalse(rows(reset, "UPREJECT"))
+        no_retries = bridge("upload 7 1 2 100 0", feed(count(1)),
+                            "tick 99", "tick 100")
+        self.assertEqual(rows(no_retries, "UPREQ"), [["42", "190", "0", "0"]])
+        self.assertEqual(rows(no_retries, "UPREJECT"), [["12", "15"]])
+        self.assertEqual(rows(bridge("upload 7 1 2 0 5", feed(count(1))), "UPREJECT"),
+                         [["0", "-"]])
+
+    def test_changed_count_is_not_a_duplicate(self):
+        output = bridge("upload 7 1 3", feed(count(3)),
+                        feed(count(3, opaque=1)), feed(item(0)))
+        self.assertEqual(rows(output, "UPREJECT"), [["5", "-"]])
+        self.assertEqual([row[-1] for row in rows(output, "UPREQ")], ["0", "1"])
+
+    def test_identical_nan_final_item_replays_ack(self):
+        missing_altitude = item(0, alt=float("nan"))
+        output = bridge("upload 7 1 2", feed(count(1)),
+                        feed(missing_altitude), "ack 0", feed(missing_altitude))
+        self.assertEqual(len(rows(output, "UPCOMPLETE")), 1)
+        self.assertEqual(rows(output, "UPACK"),
+                         [["42", "190", "0", "0"], ["42", "190", "0", "0"]])
+
+    def test_failed_replacement_keeps_previous_accepted_plan(self):
+        output = bridge("upload 7 1 2", feed(count(1)), feed(item(0)),
+                        "ack 0", "active", feed(count(2)),
+                        feed(item(0, lat=-400000000)), "active",
+                        feed(item(1, command=21)), "active",
+                        feed(count(2)), "tick 250000", "tick 500000",
+                        "tick 750000", "tick 1000000", "tick 1250000",
+                        "tick 1500000", "active")
+        self.assertEqual(rows(output, "ACTIVE"),
+                         [["42", "1", "50"]] * 4)
+        self.assertEqual(rows(output, "UPREJECT"),
+                         [["10", "3"], ["12", "15"]])
+        self.assertEqual(len(rows(output, "UPCOMPLETE")), 1)
 
 
 if __name__ == "__main__":
