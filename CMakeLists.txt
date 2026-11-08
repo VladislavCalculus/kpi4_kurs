@@ -30,23 +30,11 @@ if(BUILD_TESTING)
         ${Python3_EXECUTABLE} -m unittest discover
         -s ${CMAKE_CURRENT_SOURCE_DIR}/tests/python -p "test_reader.py" -v)
 
-    add_executable(kpi4_mission_transfer_test tests/mission_transfer_test.cpp)
-    target_link_libraries(kpi4_mission_transfer_test PRIVATE kpi4_protocol)
-    add_test(NAME mission_transfer COMMAND kpi4_mission_transfer_test)
-
-    add_executable(kpi4_mission_normalizer_test tests/mission_normalizer_test.cpp)
-    target_link_libraries(kpi4_mission_normalizer_test PRIVATE kpi4_protocol)
-    add_test(NAME mission_normalizer COMMAND kpi4_mission_normalizer_test)
-
-    add_executable(kpi4_mission_command_validator_test
-        tests/mission_command_validator_test.cpp)
-    target_link_libraries(kpi4_mission_command_validator_test PRIVATE kpi4_protocol)
-    add_test(NAME mission_command_validator
-        COMMAND kpi4_mission_command_validator_test)
-
-    add_executable(kpi4_mission_upload_test tests/mission_upload_test.cpp)
-    target_link_libraries(kpi4_mission_upload_test PRIVATE kpi4_protocol)
-    add_test(NAME mission_upload COMMAND kpi4_mission_upload_test)
+    add_test(NAME python_mission COMMAND ${CMAKE_COMMAND} -E env
+        KPI4_BRIDGE=$<TARGET_FILE:kpi4_test_bridge>
+        KPI4_CLI=$<TARGET_FILE:kpi4_cli>
+        ${Python3_EXECUTABLE} -m unittest discover
+        -s ${CMAKE_CURRENT_SOURCE_DIR}/tests/python -p "test_mission.py" -v)
 
     add_executable(kpi4_estimated_position_test tests/estimated_position_test.cpp)
     target_link_libraries(kpi4_estimated_position_test PRIVATE kpi4_protocol)
