@@ -1,10 +1,15 @@
 #include "frame_log.hpp"
 #include <kpi4/protocol/frame_reader.hpp>
 #include <kpi4/protocol/heartbeat.hpp>
+#include <kpi4/protocol/estimated_position.hpp>
+#include <kpi4/protocol/raw_gps.hpp>
 #include <kpi4/protocol/mission_command_validator.hpp>
 #include <kpi4/protocol/mission_normalizer.hpp>
 #include <kpi4/protocol/mission_transfer.hpp>
 #include <kpi4/protocol/mission_upload.hpp>
+#include <kpi4/state/mavlink_provider.hpp>
+#include <kpi4/state/simulated_provider.hpp>
+#include <kpi4/state/validator.hpp>
 #include <chrono>
 #include <cstdint>
 #include <iomanip>
@@ -91,12 +96,80 @@ void emit_mission(const protocol::MissionTransferEvent& event) {
                   << value->opaque_id << '\n';
     }
 }
+
+template <typename T> void optional_field(const std::optional<T>& value) {
+    if (value) std::cout << '\t' << *value;
+    else std::cout << "\t-";
+}
+
+void emit_state(const core::StateSample& sample) {
+    std::cout << "STATE\t" << static_cast<int>(sample.source) << '\t'
+              << sample.measured_at.value << '\t' << sample.received_at.value
+              << '\t' << sample.position.latitude.value << '\t'
+              << sample.position.longitude.value;
+    optional_field(sample.altitude ? std::optional<double>{sample.altitude->value.value} : std::nullopt);
+    optional_field(sample.altitude ? std::optional<int>{static_cast<int>(sample.altitude->reference)} : std::nullopt);
+    optional_field(sample.velocity ? std::optional<double>{sample.velocity->north.value} : std::nullopt);
+    optional_field(sample.velocity ? std::optional<double>{sample.velocity->east.value} : std::nullopt);
+    optional_field(sample.heading_true_north ? std::optional<double>{sample.heading_true_north->value} : std::nullopt);
+    optional_field(sample.horizontal_accuracy ? std::optional<double>{sample.horizontal_accuracy->value} : std::nullopt);
+    optional_field(sample.gps_fix ? std::optional<int>{static_cast<int>(*sample.gps_fix)} : std::nullopt);
+    std::cout << '\n';
+}
+
+void emit_estimated(const protocol::EstimatedPosition& value) {
+    std::cout << "EST\t" << value.time_boot_ms << '\t'
+              << value.position.latitude.value << '\t' << value.position.longitude.value
+              << '\t' << value.altitude_msl.value.value << '\t'
+              << value.altitude_relative_to_home.value.value << '\t'
+              << value.horizontal_velocity.north.value << '\t'
+              << value.horizontal_velocity.east.value << '\t'
+              << value.velocity_down.value;
+    optional_field(value.heading ? std::optional<double>{value.heading->value} : std::nullopt);
+    std::cout << '\n';
+}
+
+void emit_gps(const protocol::RawGps& value) {
+    std::cout << "GPS\t" << value.time_usec << '\t'
+              << static_cast<unsigned>(value.fix_type) << '\t'
+              << value.position.latitude.value << '\t'
+              << value.position.longitude.value << '\t' << value.altitude_msl.value.value;
+    optional_field(value.horizontal_dop);
+    optional_field(value.vertical_dop);
+    optional_field(value.ground_speed ? std::optional<double>{value.ground_speed->value} : std::nullopt);
+    optional_field(value.course_over_ground ? std::optional<double>{value.course_over_ground->value} : std::nullopt);
+    optional_field(value.satellites_visible ? std::optional<int>{*value.satellites_visible} : std::nullopt);
+    optional_field(value.altitude_ellipsoid ? std::optional<double>{value.altitude_ellipsoid->value} : std::nullopt);
+    optional_field(value.horizontal_uncertainty ? std::optional<double>{value.horizontal_uncertainty->value} : std::nullopt);
+    optional_field(value.vertical_uncertainty ? std::optional<double>{value.vertical_uncertainty->value} : std::nullopt);
+    optional_field(value.speed_uncertainty ? std::optional<double>{value.speed_uncertainty->value} : std::nullopt);
+    optional_field(value.track_uncertainty ? std::optional<double>{value.track_uncertainty->value} : std::nullopt);
+    optional_field(value.gps_yaw ? std::optional<double>{value.gps_yaw->value} : std::nullopt);
+    std::cout << '\n';
+}
 }
 
 int main() {
     kpi4::protocol::FrameReader reader;
     std::optional<mavlink_message_t> last;
     std::unique_ptr<protocol::MissionUploadAssembler> upload;
+    std::unique_ptr<state::MavlinkStateProvider> state_provider;
+    std::unique_ptr<state::StateValidator> validator;
+    state::SimulatedStateProvider simulated;
+    state::SampleTimes times{{0}, {0}};
+    core::MonotonicMicroseconds now{0};
+    const auto emit_validity = [&](const core::StateSample& sample) {
+        if (!validator) return;
+        const auto result = validator->validate(sample, now);
+        if (const auto* reason = std::get_if<state::StateRejectReason>(&result))
+            std::cout << "VALID\trejected\t" << static_cast<int>(*reason) << '\n';
+        else std::cout << "VALID\taccepted\n";
+    };
+    const auto emit_latest = [&]() {
+        if (!state_provider) return;
+        const auto sample = state_provider->take_latest();
+        if (sample) { emit_state(*sample); emit_validity(*sample); }
+    };
     std::cout << std::setprecision(17);
     std::string line;
     try {
@@ -134,6 +207,20 @@ int main() {
                             emit_mission(*mission);
                             if (upload) emit_upload(upload->ingest(*mission));
                         }
+                        if (const auto estimated = protocol::decode_global_position_int(result)) {
+                            if (const auto* value = std::get_if<protocol::EstimatedPosition>(&*estimated)) {
+                                emit_estimated(*value);
+                                if (state_provider) { state_provider->accept(*value, times); emit_latest(); }
+                            } else std::cout << "ESTERR\t"
+                                             << static_cast<int>(std::get<protocol::EstimatedPositionError>(*estimated)) << '\n';
+                        }
+                        if (const auto gps = protocol::decode_gps_raw_int(result)) {
+                            if (const auto* value = std::get_if<protocol::RawGps>(&*gps)) {
+                                emit_gps(*value);
+                                if (state_provider) { state_provider->accept(*value, times); emit_latest(); }
+                            } else std::cout << "GPSERR\t"
+                                             << static_cast<int>(std::get<protocol::RawGpsError>(*gps)) << '\n';
+                        }
                     }
                 }
                 const auto counts = reader.counts(source);
@@ -153,6 +240,54 @@ int main() {
                 mavlink_msg_mission_count_pack(42, 190, &message, target, 1, 513, 2,
                                                0xFEDCBA98);
                 std::cout << "WIRE\t" << to_hex(message) << '\n';
+            } else if (command == "state") {
+                int source;
+                input >> source;
+                state_provider = std::make_unique<state::MavlinkStateProvider>(
+                    static_cast<core::StateSource>(source));
+            } else if (command == "clock") {
+                input >> times.measured_at.value >> times.received_at.value >> now.value;
+            } else if (command == "validator") {
+                std::uint64_t age, delay;
+                std::string accuracy, fix;
+                input >> age >> delay >> accuracy >> fix;
+                state::StateValidationConfig config{
+                    age, delay,
+                    accuracy == "-" ? std::nullopt :
+                        std::optional<core::Meters>{core::Meters{std::stod(accuracy)}},
+                    fix == "-" ? std::nullopt :
+                        std::optional<core::GpsFix>{static_cast<core::GpsFix>(std::stoi(fix))}};
+                validator = std::make_unique<state::StateValidator>(config);
+            } else if (command == "sim" || command == "direct") {
+                int source;
+                std::uint64_t measured, received;
+                std::string lat, lon, altitude, reference, north, east, heading, accuracy, fix;
+                input >> source >> measured >> received >> lat >> lon >> altitude
+                      >> reference >> north >> east >> heading >> accuracy >> fix;
+                const auto number = [](const std::string& text) -> std::optional<double> {
+                    return text == "-" ? std::nullopt : std::optional<double>{std::stod(text)};
+                };
+                core::StateSample sample{{measured}, {received},
+                    static_cast<core::StateSource>(source),
+                    {{std::stod(lat)}, {std::stod(lon)}},
+                    std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+                if (const auto value = number(altitude))
+                    sample.altitude = core::Altitude{{*value},
+                        static_cast<core::AltitudeReference>(std::stoi(reference))};
+                if (const auto value = number(north)) {
+                    const auto east_value = number(east);
+                    if (!east_value) throw std::runtime_error("missing east velocity");
+                    sample.velocity = core::NorthEastVelocity{{*value}, {*east_value}};
+                }
+                if (const auto value = number(heading)) sample.heading_true_north = core::Degrees{*value};
+                if (const auto value = number(accuracy)) sample.horizontal_accuracy = core::Meters{*value};
+                if (fix != "-") sample.gps_fix = static_cast<core::GpsFix>(std::stoi(fix));
+                if (command == "direct") { emit_state(sample); emit_validity(sample); }
+                else {
+                    simulated.publish(sample);
+                    const auto value = simulated.take_latest();
+                    if (value) { emit_state(*value); emit_validity(*value); }
+                }
             } else if (command == "ack") {
                 unsigned result;
                 input >> result;
@@ -207,6 +342,58 @@ int main() {
                     auto value = out.str();
                     if (!value.empty() && value.back() == '\n') value.pop_back();
                     std::cout << "FORMAT\t" << value << '\n';
+                }
+            } else if (command == "format_raw") {
+                std::int64_t milliseconds;
+                unsigned magic, system, component, message, sequence, length, signed_flag;
+                input >> milliseconds >> magic >> system >> component >> message
+                      >> sequence >> length >> signed_flag;
+                mavlink_message_t frame{};
+                frame.magic = static_cast<std::uint8_t>(magic);
+                frame.sysid = system;
+                frame.compid = static_cast<std::uint8_t>(component);
+                frame.msgid = message;
+                frame.seq = static_cast<std::uint8_t>(sequence);
+                frame.len = static_cast<std::uint8_t>(length);
+                frame.incompat_flags = signed_flag ? MAVLINK_IFLAG_SIGNED : 0;
+                std::ostringstream out;
+                host::write_frame_metadata(out, frame,
+                    std::chrono::system_clock::time_point{std::chrono::milliseconds{milliseconds}});
+                auto value = out.str();
+                if (!value.empty() && value.back() == '\n') value.pop_back();
+                std::cout << "FORMAT\t" << value << '\n';
+            } else if (command == "probe") {
+                std::string kind;
+                unsigned magic, length, message;
+                input >> kind >> magic >> length >> message;
+                if (!last) {
+                    std::cout << "PROBE\tignored\n";
+                } else {
+                    auto modified = *last;
+                    modified.magic = static_cast<std::uint8_t>(magic);
+                    modified.len = static_cast<std::uint8_t>(length);
+                    modified.msgid = message;
+                    protocol::FrameReadResult event{protocol::InputChannel::Unspecified,
+                                                     modified, std::nullopt};
+                    if (kind == "heartbeat") {
+                        std::cout << "PROBE\t"
+                                  << (protocol::decode_heartbeat(event) ? "accepted" : "ignored") << '\n';
+                    } else if (kind == "mission") {
+                        std::cout << "PROBE\t"
+                                  << (protocol::decode_mission_transfer(event) ? "accepted" : "ignored") << '\n';
+                    } else if (kind == "estimated") {
+                        const auto value = protocol::decode_global_position_int(event);
+                        if (!value) std::cout << "PROBE\tignored\n";
+                        else if (const auto* error = std::get_if<protocol::EstimatedPositionError>(&*value))
+                            std::cout << "PROBE\trejected\t" << static_cast<int>(*error) << '\n';
+                        else std::cout << "PROBE\taccepted\n";
+                    } else if (kind == "gps") {
+                        const auto value = protocol::decode_gps_raw_int(event);
+                        if (!value) std::cout << "PROBE\tignored\n";
+                        else if (const auto* error = std::get_if<protocol::RawGpsError>(&*value))
+                            std::cout << "PROBE\trejected\t" << static_cast<int>(*error) << '\n';
+                        else std::cout << "PROBE\taccepted\n";
+                    } else throw std::runtime_error("unknown probe kind");
                 }
             } else if (!command.empty()) {
                 throw std::runtime_error("unknown command: " + command);

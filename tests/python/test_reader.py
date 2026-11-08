@@ -73,6 +73,12 @@ class ReaderTests(unittest.TestCase):
             self.assertEqual(rows(output, "FORMAT"), [[
                 f"frame time=1970-01-01T00:00:00.123Z mavlink={version} sysid=1 compid=1 msgid=0 seq=0 len=9 signed=no"]])
         self.assertEqual(bridge("format 123"), [["FORMATNONE"]])
+        self.assertEqual(rows(bridge("format_raw 123 253 42 255 300 254 13 1"), "FORMAT"), [[
+            "frame time=1970-01-01T00:00:00.123Z mavlink=2 sysid=42 compid=255 msgid=300 seq=254 len=13 signed=yes"]])
+        self.assertEqual(rows(bridge(feed(fixture("heartbeat_v2.bin")),
+                                     "probe heartbeat 253 8 0",
+                                     "probe heartbeat 253 9 4"), "PROBE"),
+                         [["ignored"], ["ignored"]])
 
     def test_cli_file_stdin_and_errors(self):
         path = lambda name: str(ROOT / "fixtures" / name)

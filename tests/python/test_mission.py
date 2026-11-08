@@ -9,6 +9,11 @@ class MissionTests(unittest.TestCase):
         self.assertEqual(rows(bridge(feed(wire)), "MCOUNT"),
                          [["42", "190", "70000", "1", "2", "513", str(0xFEDCBA98)]])
 
+    def test_short_or_unrelated_ack_is_ignored(self):
+        output = bridge(feed(ack(0)), "probe mission 253 2 47",
+                        "probe mission 253 3 0")
+        self.assertEqual(rows(output, "PROBE"), [["ignored"], ["ignored"]])
+
     def test_transfer_fields(self):
         output = bridge(feed(count(513, kind=2, opaque=0xFEDCBA98), 1),
                         feed(request(65535), 2),

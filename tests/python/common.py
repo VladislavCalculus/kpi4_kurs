@@ -32,8 +32,8 @@ def cli(*args, data=None):
                           check=True).stdout.decode()
 
 
-CRC_EXTRA = {44: 221, 47: 153, 51: 196, 73: 38}
-MIN_LEN = {44: 4, 47: 3, 51: 4, 73: 37}
+CRC_EXTRA = {24: 24, 33: 104, 44: 221, 47: 153, 51: 196, 73: 38}
+MIN_LEN = {24: 30, 33: 1, 44: 4, 47: 3, 51: 4, 73: 37}
 
 
 def crc_x25(data):
@@ -81,3 +81,21 @@ def item(seq, *, command=16, lat=500000000, lon=300000000, alt=120.0,
 def ack(result, *, target=42, component=190, kind=0, opaque=0):
     return frame(47, struct.pack("<BBBBI", target, component, result, kind, opaque),
                  sysid=7, compid=1)
+
+
+def estimated(*, time=4000000000, lat=-432345678, lon=1791234567,
+              alt=-12345, relative=2500, north=-321, east=456, down=-70,
+              heading=27001, version=2):
+    payload = struct.pack("<IiiiihhhH", time, lat, lon, alt, relative,
+                          north, east, down, heading)
+    return frame(33, payload, sysid=7, compid=1, version=version)
+
+
+def gps(*, time=123456789, fix=3, lat=-432345678, lon=1791234567,
+        alt=-12345, eph=123, epv=456, speed=789, course=27001,
+        satellites=14, ellipsoid=-11234, hacc=250, vacc=1200,
+        velacc=340, hdgacc=123456, yaw=36000, version=2):
+    payload = struct.pack("<QiiiHHHHBBiIIIIH", time, lat, lon, alt, eph,
+                          epv, speed, course, fix, satellites, ellipsoid,
+                          hacc, vacc, velacc, hdgacc, yaw)
+    return frame(24, payload, sysid=7, compid=1, version=version)
