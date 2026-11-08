@@ -73,6 +73,10 @@ if(BUILD_TESTING)
     add_test(NAME mission_command_validator
         COMMAND kpi4_mission_command_validator_test)
 
+    add_executable(kpi4_mission_upload_test tests/mission_upload_test.cpp)
+    target_link_libraries(kpi4_mission_upload_test PRIVATE kpi4_protocol)
+    add_test(NAME mission_upload COMMAND kpi4_mission_upload_test)
+
     add_executable(kpi4_estimated_position_test tests/estimated_position_test.cpp)
     target_link_libraries(kpi4_estimated_position_test PRIVATE kpi4_protocol)
     add_test(NAME estimated_position COMMAND kpi4_estimated_position_test)
