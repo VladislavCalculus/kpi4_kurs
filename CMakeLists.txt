@@ -85,6 +85,10 @@ if(BUILD_TESTING)
     target_link_libraries(kpi4_state_provider_test PRIVATE kpi4_state)
     add_test(NAME state_provider COMMAND kpi4_state_provider_test)
 
+    add_executable(kpi4_state_validator_test tests/state_validator_test.cpp)
+    target_link_libraries(kpi4_state_validator_test PRIVATE kpi4_state)
+    add_test(NAME state_validator COMMAND kpi4_state_validator_test)
+
     add_test(NAME cli_heartbeat_gcs
         COMMAND kpi4_cli --input ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/heartbeat_gcs_v2.bin)
     set_tests_properties(cli_heartbeat_gcs PROPERTIES

@@ -15,7 +15,8 @@ class StateProvider {
 public:
     virtual ~StateProvider() = default;
 
-    // Returns the latest unread sample, then clears it. Providers retain only
+    // Returns the latest unread candidate, then clears it. The caller must
+    // validate the sample before using it for guidance. Providers retain only
     // one sample so a slow consumer receives the newest observation.
     virtual std::optional<core::StateSample> take_latest() = 0;
 };
