@@ -3,6 +3,7 @@ project(kpi4 LANGUAGES CXX)
 
 add_subdirectory(core)
 add_subdirectory(protocol)
+add_subdirectory(mission)
 add_subdirectory(state)
 
 add_library(kpi4_host_input app/byte_source.cpp)
@@ -23,7 +24,7 @@ if(BUILD_TESTING)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
     add_executable(kpi4_test_bridge tools/test_bridge.cpp)
     target_include_directories(kpi4_test_bridge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/app)
-    target_link_libraries(kpi4_test_bridge PRIVATE kpi4_host_logging kpi4_state)
+    target_link_libraries(kpi4_test_bridge PRIVATE kpi4_host_logging kpi4_state kpi4_mission)
     add_test(NAME python_reader COMMAND ${CMAKE_COMMAND} -E env
         KPI4_BRIDGE=$<TARGET_FILE:kpi4_test_bridge>
         KPI4_CLI=$<TARGET_FILE:kpi4_cli>

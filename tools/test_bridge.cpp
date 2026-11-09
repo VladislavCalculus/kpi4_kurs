@@ -7,6 +7,7 @@
 #include <kpi4/protocol/mission_normalizer.hpp>
 #include <kpi4/protocol/mission_transfer.hpp>
 #include <kpi4/protocol/mission_upload.hpp>
+#include <kpi4/mission/plan_store.hpp>
 #include <kpi4/state/mavlink_provider.hpp>
 #include <kpi4/state/simulated_provider.hpp>
 #include <kpi4/state/validator.hpp>
@@ -158,7 +159,8 @@ int main() {
     kpi4::protocol::FrameReader reader;
     std::optional<mavlink_message_t> last;
     std::unique_ptr<protocol::MissionUploadAssembler> upload;
-    std::optional<protocol::MissionUploadCandidate> active_plan;
+    mission::MissionPlanStore plan_store;
+    std::shared_ptr<const mission::MissionPlan> saved_plan;
     std::optional<protocol::MissionUploadCandidate> staged_plan;
     std::unique_ptr<state::MavlinkStateProvider> state_provider;
     std::unique_ptr<state::StateValidator> validator;
@@ -262,11 +264,41 @@ int main() {
                     emit_upload(transition);
                 }
             } else if (command == "active") {
-                if (active_plan)
-                    std::cout << "ACTIVE\t" << active_plan->source.system_id << '\t'
-                              << active_plan->items.size() << '\t'
-                              << active_plan->items.front().target.latitude.value << '\n';
+                const auto plan = plan_store.active();
+                if (plan)
+                    std::cout << "ACTIVE\t" << plan->owner.system_id << '\t'
+                              << plan->items.size() << '\t'
+                              << plan->items.front().target.latitude.value << '\n';
                 else std::cout << "ACTIVE\t-\n";
+            } else if (command == "plan" || command == "saved") {
+                const auto plan = command == "plan" ? plan_store.active() : saved_plan;
+                if (plan)
+                    std::cout << "PLAN\t" << plan->version << '\t'
+                              << static_cast<int>(plan->owner.channel) << '\t'
+                              << plan->owner.system_id << '\t'
+                              << static_cast<unsigned>(plan->owner.component_id) << '\t'
+                              << plan->items.size() << '\t'
+                              << plan->items.front().target.latitude.value << '\n';
+                else std::cout << "PLAN\t-\n";
+            } else if (command == "save") {
+                saved_plan = plan_store.active();
+            } else if (command == "plan_raw") {
+                const auto plan = plan_store.active();
+                if (plan)
+                    std::cout << "PLANRAW\t" << plan->version << '\t'
+                              << plan->raw_items.size() << '\t'
+                              << plan->raw_items.front().seq << '\t'
+                              << plan->raw_items.front().command << '\t'
+                              << plan->raw_items.front().x << '\t'
+                              << plan->raw_items.front().param1 << '\n';
+                else std::cout << "PLANRAW\t-\n";
+            } else if (command == "corrupt_staged") {
+                if (!staged_plan) throw std::runtime_error("no staged plan");
+                staged_plan->raw_items.clear();
+            } else if (command == "start") {
+                std::cout << "START\t" << static_cast<int>(plan_store.start()) << '\n';
+            } else if (command == "discard") {
+                std::cout << "DISCARD\t" << plan_store.discard_preflight() << '\n';
             } else if (command == "wide_count") {
                 std::uint32_t target;
                 input >> target;
@@ -325,10 +357,20 @@ int main() {
             } else if (command == "ack") {
                 unsigned result;
                 input >> result;
+                if (result == MAV_MISSION_ACCEPTED && staged_plan) {
+                    const auto stored = plan_store.accept(std::move(*staged_plan));
+                    if (const auto* error = std::get_if<mission::PlanStoreError>(&stored)) {
+                        std::cout << "STORE\trejected\t" << static_cast<int>(*error) << '\n';
+                        result = *error == mission::PlanStoreError::InvalidCandidate
+                                     ? MAV_MISSION_INVALID : MAV_MISSION_DENIED;
+                    } else {
+                        std::cout << "STORE\taccepted\t"
+                                  << std::get<std::shared_ptr<const mission::MissionPlan>>(stored)->version
+                                  << '\n';
+                    }
+                }
                 const auto value = upload ? upload->finish_after_plan_decision(
                     static_cast<std::uint8_t>(result)) : std::nullopt;
-                if (value && result == MAV_MISSION_ACCEPTED && staged_plan)
-                    active_plan = std::move(staged_plan);
                 staged_plan.reset();
                 if (value) std::cout << "UPACK\t" << value->target.system_id << '\t'
                                      << static_cast<unsigned>(value->target.component_id) << '\t'

@@ -163,5 +163,86 @@ class MissionTests(unittest.TestCase):
         self.assertEqual(len(rows(output, "UPCOMPLETE")), 1)
 
 
+class PlanStoreTests(unittest.TestCase):
+    def test_versions_and_immutable_snapshot(self):
+        output = bridge("upload 7 1 2", "start", "plan",
+                        feed(count(1)), feed(item(0, hold=3.5)),
+                        "ack 0", "plan", "plan_raw", "save",
+                        feed(count(1)), feed(item(0, lat=-400000000)),
+                        "ack 0", "plan", "saved", "start", "start",
+                        "discard", "plan")
+        self.assertEqual(rows(output, "START"), [["1"], ["0"], ["3"]])
+        self.assertEqual(rows(output, "STORE"),
+                         [["accepted", "1"], ["accepted", "2"]])
+        self.assertEqual(rows(output, "PLAN"),
+                         [["-"], ["1", "0", "42", "190", "1", "50"],
+                          ["2", "0", "42", "190", "1", "-40"],
+                          ["1", "0", "42", "190", "1", "50"],
+                          ["2", "0", "42", "190", "1", "-40"]])
+        self.assertEqual(rows(output, "DISCARD"), [["0"]])
+        self.assertEqual(rows(output, "PLANRAW"),
+                         [["1", "1", "0", "16", "500000000", "3.5"]])
+
+    def test_preflight_conflict_requires_explicit_discard(self):
+        output = bridge("upload 7 1 2", feed(count(1)), feed(item(0)),
+                        "ack 0", feed(count(1, sender=43)),
+                        feed(item(0, sender=43, lat=-400000000)),
+                        "ack 0", "plan", "start",
+                        feed(count(1)), feed(item(0)), "ack 0", "start",
+                        "discard", "plan", "start",
+                        feed(count(1, sender=43)),
+                        feed(item(0, sender=43, lat=-400000000)),
+                        "ack 0", "plan", "start")
+        self.assertEqual(rows(output, "STORE"),
+                         [["accepted", "1"], ["rejected", "1"],
+                          ["rejected", "2"], ["accepted", "2"]])
+        self.assertEqual(rows(output, "START"),
+                         [["2"], ["2"], ["1"], ["0"]])
+        self.assertEqual(rows(output, "PLAN"),
+                         [["1", "0", "42", "190", "1", "50"], ["-"],
+                          ["2", "0", "43", "190", "1", "-40"]])
+        self.assertEqual(rows(output, "DISCARD"), [["1"]])
+        self.assertEqual([row[-1] for row in rows(output, "UPACK")],
+                         ["0", "14", "14", "0"])
+
+    def test_started_plan_keeps_its_source(self):
+        output = bridge("upload 7 1 2", feed(count(1)), feed(item(0)),
+                        "ack 0", "start",
+                        feed(count(1)), feed(item(0, lat=-400000000)),
+                        "ack 0", feed(count(1, sender=43)),
+                        feed(item(0, sender=43, lat=100000000)),
+                        "ack 0", "discard", "plan")
+        self.assertEqual(rows(output, "START"), [["0"]])
+        self.assertEqual(rows(output, "STORE"),
+                         [["accepted", "1"], ["rejected", "3"],
+                          ["rejected", "4"]])
+        self.assertEqual(rows(output, "DISCARD"), [["0"]])
+        self.assertEqual(rows(output, "PLAN"),
+                         [["1", "0", "42", "190", "1", "50"]])
+        self.assertEqual([row[-1] for row in rows(output, "UPACK")],
+                         ["0", "14", "14"])
+
+    def test_channel_is_part_of_source_identity(self):
+        output = bridge("upload 7 1 2", feed(count(1), 1), feed(item(0), 1),
+                        "ack 0", feed(count(1), 2), feed(item(0), 2),
+                        "ack 0", "start", "plan")
+        self.assertEqual(rows(output, "STORE"),
+                         [["accepted", "1"], ["rejected", "1"]])
+        self.assertEqual(rows(output, "START"), [["2"]])
+        self.assertEqual(rows(output, "PLAN"),
+                         [["1", "1", "42", "190", "1", "50"]])
+
+    def test_incomplete_candidate_does_not_replace_plan(self):
+        output = bridge("upload 7 1 2", feed(count(1)), feed(item(0)),
+                        "ack 0", feed(count(1)), feed(item(0, lat=-400000000)),
+                        "corrupt_staged", "ack 0", "plan")
+        self.assertEqual(rows(output, "STORE"),
+                         [["accepted", "1"], ["rejected", "0"]])
+        self.assertEqual([row[-1] for row in rows(output, "UPACK")],
+                         ["0", "5"])
+        self.assertEqual(rows(output, "PLAN"),
+                         [["1", "0", "42", "190", "1", "50"]])
+
+
 if __name__ == "__main__":
     unittest.main()
