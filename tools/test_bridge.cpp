@@ -11,8 +11,10 @@
 #include <kpi4/state/mavlink_provider.hpp>
 #include <kpi4/state/simulated_provider.hpp>
 #include <kpi4/state/validator.hpp>
+#include <kpi4/config/host_config.hpp>
 #include <chrono>
 #include <cstdint>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <memory>
@@ -160,6 +162,7 @@ int main() {
     std::optional<mavlink_message_t> last;
     std::unique_ptr<protocol::MissionUploadAssembler> upload;
     mission::MissionPlanStore plan_store;
+    config::HostConfigStore config_store;
     std::shared_ptr<const mission::MissionPlan> saved_plan;
     std::optional<protocol::MissionUploadCandidate> staged_plan;
     std::unique_ptr<state::MavlinkStateProvider> state_provider;
@@ -311,6 +314,43 @@ int main() {
                 input >> source;
                 state_provider = std::make_unique<state::MavlinkStateProvider>(
                     static_cast<core::StateSource>(source));
+            } else if (command == "config_load") {
+                std::string path;
+                input >> path;
+                std::ifstream file(path);
+                const auto result = config_store.load(file, path);
+                if (const auto* snapshot =
+                        std::get_if<std::shared_ptr<const config::ConfigSnapshot>>(&result))
+                    std::cout << "CONFIG\taccepted\t" << (*snapshot)->version << '\n';
+                else {
+                    const auto& failure = std::get<config::ConfigFailure>(result);
+                    std::cout << "CONFIG\trejected\t" << static_cast<int>(failure.error)
+                              << '\t' << failure.field << '\n';
+                }
+            } else if (command == "config_current") {
+                const auto snapshot = config_store.current();
+                if (!snapshot) std::cout << "CONFIGCURRENT\t-\n";
+                else {
+                    std::cout << "CONFIGCURRENT\t" << snapshot->version << '\t'
+                              << static_cast<int>(snapshot->source) << '\t'
+                              << static_cast<int>(snapshot->reading_type) << '\t'
+                              << snapshot->state_limits.max_measurement_age_us << '\t'
+                              << snapshot->state_limits.max_delivery_delay_us;
+                    optional_field(snapshot->state_limits.max_horizontal_accuracy ?
+                        std::optional<double>{snapshot->state_limits.max_horizontal_accuracy->value} :
+                        std::nullopt);
+                    optional_field(snapshot->state_limits.minimum_gps_fix ?
+                        std::optional<int>{static_cast<int>(*snapshot->state_limits.minimum_gps_fix)} :
+                        std::nullopt);
+                    std::cout << '\t' << snapshot->origin << '\n';
+                }
+            } else if (command == "config_apply") {
+                const auto snapshot = config_store.current();
+                if (!snapshot) std::cout << "CONFIGAPPLY\trejected\n";
+                else {
+                    validator = std::make_unique<state::StateValidator>(snapshot->state_limits);
+                    std::cout << "CONFIGAPPLY\taccepted\n";
+                }
             } else if (command == "clock") {
                 input >> times.measured_at.value >> times.received_at.value >> now.value;
             } else if (command == "validator") {

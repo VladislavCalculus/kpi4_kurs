@@ -5,6 +5,7 @@ add_subdirectory(core)
 add_subdirectory(protocol)
 add_subdirectory(mission)
 add_subdirectory(state)
+add_subdirectory(config)
 
 add_library(kpi4_host_input app/byte_source.cpp)
 target_compile_features(kpi4_host_input PUBLIC cxx_std_17)
@@ -24,7 +25,7 @@ if(BUILD_TESTING)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
     add_executable(kpi4_test_bridge tools/test_bridge.cpp)
     target_include_directories(kpi4_test_bridge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/app)
-    target_link_libraries(kpi4_test_bridge PRIVATE kpi4_host_logging kpi4_state kpi4_mission)
+    target_link_libraries(kpi4_test_bridge PRIVATE kpi4_host_logging kpi4_mission kpi4_config)
     add_test(NAME python_reader COMMAND ${CMAKE_COMMAND} -E env
         KPI4_BRIDGE=$<TARGET_FILE:kpi4_test_bridge>
         KPI4_CLI=$<TARGET_FILE:kpi4_cli>
@@ -42,4 +43,10 @@ if(BUILD_TESTING)
         KPI4_CLI=$<TARGET_FILE:kpi4_cli>
         ${Python3_EXECUTABLE} -m unittest discover
         -s ${CMAKE_CURRENT_SOURCE_DIR}/tests/python -p "test_state.py" -v)
+
+    add_test(NAME python_config COMMAND ${CMAKE_COMMAND} -E env
+        KPI4_BRIDGE=$<TARGET_FILE:kpi4_test_bridge>
+        KPI4_CLI=$<TARGET_FILE:kpi4_cli>
+        ${Python3_EXECUTABLE} -m unittest discover
+        -s ${CMAKE_CURRENT_SOURCE_DIR}/tests/python -p "test_config.py" -v)
 endif()
