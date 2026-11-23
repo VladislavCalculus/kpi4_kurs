@@ -1,0 +1,5 @@
+mode,reached,crossed_end,time_s,max_cross_track_m,final_distance_m
+baseline,0,1,13,25.0492,25.0499
+corrected,1,0,13.05,2.05947,2.93333
+scenario: length=100m speed=8m/s max_command=12m/s wind=2m/s dt=0.05s response=0.5s reach=3m corridor=5m seed=none
+result=PASS

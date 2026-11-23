@@ -86,6 +86,7 @@ enum class ModuleStatus {
     invalid_state,
     stale_state,
     command_unavailable,
+    target_reached,
 };
 
 // The output adapter chooses how to encode a supported domain target.

@@ -20,12 +20,20 @@ add_executable(kpi4_cli app/main.cpp)
 target_compile_features(kpi4_cli PRIVATE cxx_std_17)
 target_link_libraries(kpi4_cli PRIVATE kpi4_host_input kpi4_host_logging)
 
+add_executable(kpi4_demo app/guidance_demo.cpp)
+target_link_libraries(kpi4_demo PRIVATE kpi4_state)
+
 include(CTest)
 if(BUILD_TESTING)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
     add_executable(kpi4_test_bridge tools/test_bridge.cpp)
     target_include_directories(kpi4_test_bridge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/app)
     target_link_libraries(kpi4_test_bridge PRIVATE kpi4_host_logging kpi4_mission kpi4_config)
+    add_test(NAME python_guidance COMMAND ${CMAKE_COMMAND} -E env
+        KPI4_BRIDGE=$<TARGET_FILE:kpi4_test_bridge>
+        KPI4_DEMO=$<TARGET_FILE:kpi4_demo>
+        ${Python3_EXECUTABLE} -m unittest discover
+        -s ${CMAKE_CURRENT_SOURCE_DIR}/tests/python -p "test_guidance.py" -v)
     add_test(NAME python_reader COMMAND ${CMAKE_COMMAND} -E env
         KPI4_BRIDGE=$<TARGET_FILE:kpi4_test_bridge>
         KPI4_CLI=$<TARGET_FILE:kpi4_cli>

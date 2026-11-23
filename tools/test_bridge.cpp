@@ -12,6 +12,7 @@
 #include <kpi4/state/simulated_provider.hpp>
 #include <kpi4/state/validator.hpp>
 #include <kpi4/config/host_config.hpp>
+#include <kpi4/core/guidance.hpp>
 #include <chrono>
 #include <cstdint>
 #include <fstream>
@@ -417,6 +418,54 @@ int main() {
                                      << static_cast<unsigned>(value->mission_type) << '\t'
                                      << static_cast<unsigned>(value->result) << '\n';
                 else std::cout << "UPACKNONE\n";
+            } else if (command == "project" || command == "unproject") {
+                std::string a, b, c, d;
+                input >> a >> b >> c >> d;
+                const core::Wgs84Position origin{{std::stod(a)}, {std::stod(b)}};
+                std::cout << "PROJECT\t";
+                if (command == "project") {
+                    const auto p = core::to_local(origin, {{std::stod(c)}, {std::stod(d)}});
+                    if (p) std::cout << p->east.value << '\t' << p->north.value;
+                    else std::cout << '-';
+                } else {
+                    const auto p = core::to_wgs84(origin, {{std::stod(c)}, {std::stod(d)}});
+                    if (p) std::cout << p->latitude.value << '\t' << p->longitude.value;
+                    else std::cout << '-';
+                }
+                std::cout << '\n';
+            } else if (command == "guide") {
+                std::vector<std::string> values(16);
+                for (auto& value : values) input >> value;
+                const auto n = [&](std::size_t i) { return std::stod(values.at(i)); };
+                const core::MissionItem from{0, {{0.0}, {0.0}},
+                    core::AltitudeReference::relative_to_home, std::nullopt, std::nullopt};
+                auto to = from;
+                to.sequence = 1;
+                to.target = {{n(0)}, {n(1)}};
+                if (values[6] != "-") to.desired_speed = core::MetersPerSecond{n(6)};
+                core::StateSample sample{{0}, {0}, core::StateSource::simulation,
+                    {{n(2)}, {n(3)}}, std::nullopt, std::nullopt,
+                    std::nullopt, std::nullopt, std::nullopt};
+                if (values[4] != "-") sample.velocity = core::NorthEastVelocity{{n(4)}, {n(5)}};
+                const core::GuidanceConfig config{{n(9)}, {n(10)}, {n(8)}, {n(11)},
+                                                  n(12), {n(13)}, {n(7)}};
+                // Optional endpoint override exercises an unsupported origin.
+                auto start = from;
+                start.target = {{n(14)}, {n(15)}};
+                const auto step = core::follow_segment(start, to, sample, config);
+                std::cout << "GUIDE\t" << static_cast<int>(step.guidance.status)
+                          << '\t' << step.guidance.correction_required << '\t' << step.speed_limited;
+                if (step.geometry) {
+                    const auto& g = *step.geometry;
+                    std::cout << '\t' << g.length.value << '\t' << g.progress
+                              << '\t' << g.cross_track_error.value << '\t' << g.distance_to_end.value
+                              << '\t' << g.closest.east.value << '\t' << g.closest.north.value;
+                } else std::cout << "\t-\t-\t-\t-\t-\t-";
+                if (step.guidance.target) {
+                    const auto& v = std::get<core::NorthEastVelocity>(*step.guidance.target);
+                    std::cout << '\t' << v.north.value << '\t' << v.east.value;
+                } else std::cout << "\t-\t-";
+                std::cout << '\n';
             } else if (command == "normalize") {
                 unsigned frame, id, sequence;
                 std::int32_t x, y;

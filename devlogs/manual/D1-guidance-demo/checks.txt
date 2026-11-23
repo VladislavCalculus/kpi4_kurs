@@ -1,0 +1,49 @@
+$ cmake -S . -B build
+-- Configuring done (0.7s)
+-- Generating done (0.3s)
+-- Build files have been written to: /Users/admin/kpi3/kpi4/src/build
+exit=0
+
+$ cmake --build build -j 4
+[  3%] Building CXX object core/CMakeFiles/kpi4_core.dir/guidance.cpp.o
+[ 10%] Built target kpi4_host_input
+[ 13%] Linking CXX static library libkpi4_core.a
+[ 13%] Built target kpi4_core
+[ 44%] Built target kpi4_protocol
+[ 55%] Built target kpi4_mission
+[ 58%] Built target kpi4_host_logging
+[ 72%] Built target kpi4_state
+[ 75%] Linking CXX executable kpi4_cli
+[ 82%] Built target kpi4_config
+[ 86%] Linking CXX executable kpi4_demo
+[ 89%] Linking CXX executable kpi4_test_bridge
+[ 96%] Built target kpi4_test_bridge
+[ 96%] Built target kpi4_demo
+[100%] Built target kpi4_cli
+exit=0
+
+$ ctest --test-dir build --output-on-failure
+Test project /Users/admin/kpi3/kpi4/src/build
+    Start 1: python_guidance
+1/5 Test #1: python_guidance ..................   Passed    1.52 sec
+    Start 2: python_reader
+2/5 Test #2: python_reader ....................   Passed    0.84 sec
+    Start 3: python_mission
+3/5 Test #3: python_mission ...................   Passed    0.52 sec
+    Start 4: python_state
+4/5 Test #4: python_state .....................   Passed    0.53 sec
+    Start 5: python_config
+5/5 Test #5: python_config ....................   Passed    0.18 sec
+
+100% tests passed out of 5
+
+Total Test time (real) =   3.60 sec
+exit=0
+
+$ ./build/kpi4_demo --output devlogs/manual/D1-guidance-demo
+mode,reached,crossed_end,time_s,max_cross_track_m,final_distance_m
+baseline,0,1,13,25.0492,25.0499
+corrected,1,0,13.05,2.05947,2.93333
+scenario: length=100m speed=8m/s max_command=12m/s wind=2m/s dt=0.05s response=0.5s reach=3m corridor=5m seed=none
+result=PASS
+exit=0

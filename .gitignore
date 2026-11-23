@@ -3,5 +3,6 @@
 .vscode/
 diagrams/
 /build/
+/demo-output/
 __pycache__/
 *.pyc
