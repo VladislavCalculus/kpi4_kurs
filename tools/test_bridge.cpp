@@ -8,6 +8,7 @@
 #include <kpi4/protocol/mission_transfer.hpp>
 #include <kpi4/protocol/mission_upload.hpp>
 #include <kpi4/mission/plan_store.hpp>
+#include <kpi4/mission/route_follower.hpp>
 #include <kpi4/state/mavlink_provider.hpp>
 #include <kpi4/state/simulated_provider.hpp>
 #include <kpi4/state/validator.hpp>
@@ -163,6 +164,7 @@ int main() {
     std::optional<mavlink_message_t> last;
     std::unique_ptr<protocol::MissionUploadAssembler> upload;
     mission::MissionPlanStore plan_store;
+    std::unique_ptr<mission::RouteFollower> route;
     config::HostConfigStore config_store;
     std::shared_ptr<const mission::MissionPlan> saved_plan;
     std::optional<protocol::MissionUploadCandidate> staged_plan;
@@ -418,6 +420,38 @@ int main() {
                                      << static_cast<unsigned>(value->mission_type) << '\t'
                                      << static_cast<unsigned>(value->result) << '\n';
                 else std::cout << "UPACKNONE\n";
+            } else if (command == "rinit") {
+                unsigned count;
+                input >> count;
+                std::vector<core::MissionItem> items;
+                for (unsigned i = 0; i < count; ++i) {
+                    std::string east, north, speed;
+                    input >> east >> north >> speed;
+                    const auto position = core::to_wgs84({{0}, {0}}, {{std::stod(east)}, {std::stod(north)}});
+                    items.push_back({i, position.value_or(core::Wgs84Position{{91}, {0}}),
+                        core::AltitudeReference::relative_to_home, std::nullopt,
+                        speed == "-" ? std::nullopt : std::optional<core::MetersPerSecond>{{std::stod(speed)}}});
+                }
+                route = std::make_unique<mission::RouteFollower>(std::move(items), core::GuidanceConfig{});
+            } else if (command == "rstep") {
+                if (!route) throw std::runtime_error("route not initialized");
+                std::string east, north, vn, ve;
+                input >> east >> north >> vn >> ve;
+                const auto position = core::to_wgs84({{0}, {0}}, {{std::stod(east)}, {std::stod(north)}});
+                const core::StateSample sample{{0}, {0}, core::StateSource::simulation,
+                    position.value_or(core::Wgs84Position{{91}, {0}}), std::nullopt,
+                    vn == "-" ? std::nullopt : std::optional<core::NorthEastVelocity>{{{std::stod(vn)}, {std::stod(ve)}}},
+                    std::nullopt, std::nullopt, std::nullopt};
+                const auto step = route->update(sample);
+                std::cout << "ROUTE\t" << static_cast<int>(step.guidance.status)
+                          << '\t' << route->completed_segments() << '\t';
+                if (const auto segment = route->active_segment()) std::cout << *segment;
+                else std::cout << '-';
+                if (step.guidance.target) {
+                    const auto& v = std::get<core::NorthEastVelocity>(*step.guidance.target);
+                    std::cout << '\t' << v.north.value << '\t' << v.east.value;
+                } else std::cout << "\t-\t-";
+                std::cout << '\n';
             } else if (command == "project" || command == "unproject") {
                 std::string a, b, c, d;
                 input >> a >> b >> c >> d;

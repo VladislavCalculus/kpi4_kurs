@@ -1,6 +1,7 @@
 #include <kpi4/core/guidance.hpp>
 #include <kpi4/state/simulated_provider.hpp>
 #include <kpi4/state/validator.hpp>
+#include "route_demo.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -113,27 +114,58 @@ void metric_row(std::ostream& out, const char* name, const Metrics& m) {
 int main(int argc, char** argv) {
     try {
         std::filesystem::path output{"demo-output"};
-        double drift = 2.0;
+        demo::RouteOptions options;
+        bool route = false, route_options = false;
         for (int i = 1; i < argc; ++i) {
             const std::string arg = argv[i];
             if (arg == "--help") {
-                std::cout << "Usage: kpi4_demo [--output DIRECTORY] [--wind NORTH_MPS]\n";
+                std::cout << "Usage: kpi4_demo [--output DIRECTORY] [--wind NORTH_MPS]\n"
+                             "       [--scenario single|route] [--speed MPS] [--offset NORTH_M]\n"
+                             "       [--noise METRES] [--seed UINT32] [--fault none|stale|missing|no_fix]\n"
+                             "Speed, offset, noise, seed and fault apply to route only.\n";
                 return 0;
             }
-            if ((arg != "--output" && arg != "--wind") || i + 1 == argc)
-                throw std::runtime_error("expected --output DIRECTORY or --wind NORTH_MPS");
+            if (i + 1 == argc) throw std::runtime_error("missing option value");
             const std::string value = argv[++i];
             if (arg == "--output") output = value;
-            else {
+            else if (arg == "--scenario") {
+                if (value != "single" && value != "route") throw std::runtime_error("unknown scenario");
+                route = value == "route";
+            } else if (arg == "--fault") {
+                route_options = true;
+                if (value == "none") options.fault = demo::Fault::none;
+                else if (value == "stale") options.fault = demo::Fault::stale;
+                else if (value == "missing") options.fault = demo::Fault::missing;
+                else if (value == "no_fix") options.fault = demo::Fault::no_fix;
+                else throw std::runtime_error("unknown fault");
+            } else if (arg == "--seed") {
+                route_options = true;
+                if (value.empty() || value.find_first_not_of("0123456789") != std::string::npos)
+                    throw std::runtime_error("seed must be UINT32");
+                const auto seed = std::stoull(value);
+                if (seed > UINT32_MAX) throw std::runtime_error("seed exceeds UINT32");
+                options.seed = static_cast<std::uint32_t>(seed);
+            } else if (arg == "--wind" || arg == "--speed" || arg == "--offset" || arg == "--noise") {
                 std::size_t consumed = 0;
-                drift = std::stod(value, &consumed);
-                if (consumed != value.size() || !std::isfinite(drift) || std::abs(drift) > 5.0)
-                    throw std::runtime_error("wind must be finite and within [-5, 5] m/s");
-            }
+                const double number = std::stod(value, &consumed);
+                if (consumed != value.size() || !std::isfinite(number)) throw std::runtime_error("invalid number");
+                if (arg == "--wind") options.wind = number;
+                else {
+                    route_options = true;
+                    if (arg == "--speed") options.speed = number;
+                    else if (arg == "--offset") options.offset = number;
+                    else options.noise = number;
+                }
+            } else throw std::runtime_error("unknown option: " + arg);
         }
+        if (std::abs(options.wind) > 5 || options.speed < 4 || options.speed > 12 ||
+            std::abs(options.offset) > 20 || options.noise < 0 || options.noise > 0.5)
+            throw std::runtime_error("limits: wind +/-5, speed [4,12], offset +/-20, noise [0,0.5]");
+        if (!route && route_options) throw std::runtime_error("route options require --scenario route");
         std::filesystem::create_directories(output);
-        const auto baseline = run(output / "baseline.csv", false, drift);
-        const auto corrected = run(output / "corrected.csv", true, drift);
+        if (route) return demo::run_route(output, options);
+        const auto baseline = run(output / "baseline.csv", false, options.wind);
+        const auto corrected = run(output / "corrected.csv", true, options.wind);
         auto summary = output_file(output / "summary.csv");
         const char* header = "mode,reached,crossed_end,time_s,max_cross_track_m,final_distance_m\n";
         summary << header;
@@ -143,10 +175,10 @@ int main(int argc, char** argv) {
         std::cout << std::setprecision(6) << header;
         metric_row(std::cout, "baseline", baseline);
         metric_row(std::cout, "corrected", corrected);
-        const bool improved = std::abs(drift) < 0.1 ||
+        const bool improved = std::abs(options.wind) < 0.1 ||
             (corrected.max_cross < baseline.max_cross && corrected.final_distance < baseline.final_distance);
         const bool passed = corrected.reached && corrected.max_cross <= corridor && improved;
-        std::cout << "scenario: length=100m speed=8m/s max_command=12m/s wind=" << drift
+        std::cout << "scenario: length=100m speed=8m/s max_command=12m/s wind=" << options.wind
                   << "m/s dt=0.05s response=0.5s reach=3m corridor=5m seed=none\n"
                   << "result=" << (passed ? "PASS" : "FAIL") << '\n';
         return passed ? 0 : 1;

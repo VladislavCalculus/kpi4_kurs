@@ -1,0 +1,36 @@
+$ cmake -S . -B build
+-- Configuring done (0.7s)
+-- Generating done (0.2s)
+-- Build files have been written to: /Users/admin/kpi3/kpi4/src/build
+exit=0
+$ cmake --build build -j 4
+[  6%] Built target kpi4_core
+[ 12%] Built target kpi4_host_input
+[ 41%] Built target kpi4_protocol
+[ 48%] Built target kpi4_host_logging
+[ 58%] Built target kpi4_mission
+[ 70%] Built target kpi4_state
+[ 77%] Built target kpi4_cli
+[ 83%] Built target kpi4_config
+[ 93%] Built target kpi4_demo
+[100%] Built target kpi4_test_bridge
+exit=0
+$ ctest --test-dir build --output-on-failure
+Test project /Users/admin/kpi3/kpi4/src/build
+    Start 1: python_route
+1/6 Test #1: python_route .....................   Passed    0.61 sec
+    Start 2: python_guidance
+2/6 Test #2: python_guidance ..................   Passed    0.78 sec
+    Start 3: python_reader
+3/6 Test #3: python_reader ....................   Passed    0.61 sec
+    Start 4: python_mission
+4/6 Test #4: python_mission ...................   Passed    0.43 sec
+    Start 5: python_state
+5/6 Test #5: python_state .....................   Passed    0.45 sec
+    Start 6: python_config
+6/6 Test #6: python_config ....................   Passed    0.17 sec
+
+100% tests passed out of 6
+
+Total Test time (real) =   3.07 sec
+exit=0
